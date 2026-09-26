@@ -10,3 +10,4 @@ backend/inventory.db
 backend/token.txt
 backend/*.token
 backend/static
+backend/uploads

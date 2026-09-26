@@ -14,3 +14,4 @@ frontend/.env
 backend/.pytest_cache/
 backend/tests/__pycache__/
 backend/static/
+backend/uploads/

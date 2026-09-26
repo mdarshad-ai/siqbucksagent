@@ -100,15 +100,20 @@ pytest
   `users` (admin logins). SQLite locally, Postgres (Supabase) in production.
 - `backend/llm_service.py` — the OpenRouter call, using the OpenAI-compatible
   SDK pointed at `https://openrouter.ai/api/v1`. The system prompt is the
-  agent's persona + selling style + core rules. Each agent has two tools,
-  `search_inventory` and `get_item_details`, which only ever query *that
-  agent's own* stones; `get_item_details` also returns the stone's story and
-  sales guidance.
+  agent's persona + selling style + core rules. Each agent has three tools,
+  `search_inventory`, `get_item_details` and `show_item`, which only ever
+  touch *that agent's own* stones; `get_item_details` also returns the
+  stone's story and sales guidance, and `show_item` puts a stone card in
+  the chat.
 - `backend/main.py` — public endpoints: `GET /api/agents`,
   `GET /api/agents/{id}/inventory` (never includes story or guidance),
   `POST /api/chat`.
 - `backend/admin_api.py` + `backend/auth.py` — the `/api/admin` endpoints
   and logins behind the admin page.
+- `backend/storage.py` + `backend/media.py` — stone photos/videos: Supabase
+  Storage in production (browsers upload with short-lived signed URLs), a
+  local `backend/uploads/` folder in development; YouTube/Vimeo link
+  parsing; and the stone cards shown in the chat.
 - Conversation history is kept client-side and replayed on every request
   (stateless backend) — simplest thing that works for a demo.
 - `frontend/src/admin/` — the admin page at `/admin`.
@@ -128,6 +133,16 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
   - **Sales guidance**: private coaching the dealer follows but never
     quotes. Don't put real secrets here (like a floor price): an AI can
     sometimes be talked into revealing its instructions.
+- **Photos & videos** (owners and staff), in each stone's edit screen:
+  upload photos (JPG/PNG/WebP) and videos (MP4/MOV/WebM, up to 50 MB each),
+  or add a YouTube/Vimeo link for longer videos. Set captions, drag to
+  reorder (the first item is the main image), and pick a video's still
+  frame. Files upload straight from the browser to Supabase Storage.
+- **Stone cards in the chat**: when a dealer recommends a stone it calls the
+  `show_item` tool, and the customer sees a card under the reply with the
+  photos (tap for full screen), videos that play in place, price, stock and
+  key details. Sold-out stones never get a card, and there are at most three
+  cards per reply.
 - **Agents** (owners only): edit each dealer's name, stall, tagline,
   persona and selling style. Test a draft in the preview chat (real
   inventory, customers don't see it), then **Publish**. Every publish is
@@ -182,8 +197,16 @@ so inventory, personas and users survive restarts and redeploys.
    can't reach that one.) Replace `[YOUR-PASSWORD]` in it with your
    database password.
 
-The tables and the starting inventory are created automatically on the
-app's first start.
+3. For photos and videos, copy two more values:
+   - **Project URL**: Project Settings → Data API (e.g.
+     `https://abcdefgh.supabase.co`)
+   - **Secret key**: Project Settings → API Keys → create or copy a
+     **secret** key (`sb_secret_…`), or use the legacy `service_role` key.
+     It has full access, so it only ever goes into Render, never the
+     frontend or the repo.
+
+The tables, the starting inventory and the `stone-media` storage bucket are
+created automatically on the app's first start.
 
 **2. Render**
 
@@ -192,20 +215,25 @@ app's first start.
 3. Fill in the values it asks for:
    - `OPENROUTER_API_KEY` — your OpenRouter key
    - `DATABASE_URL` — the Supabase connection string from above
+   - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — the Project URL and
+     secret key from above
    - `ADMIN_EMAIL` / `ADMIN_PASSWORD` — your first owner login (password
      at least 10 characters)
 4. **Apply** and wait for the build. The shop is at the service's
    `https://….onrender.com` URL, and the admin page at `/admin`.
 
-If the service already exists, add `DATABASE_URL`, `ADMIN_EMAIL`,
-`ADMIN_PASSWORD` and `ADMIN_JWT_SECRET` (any long random string) on its
-**Environment** page instead, then redeploy.
+If the service already exists, add the same variables (plus
+`ADMIN_JWT_SECRET`, any long random string) on its **Environment** page
+instead, then redeploy.
 
 Every push to `main` redeploys automatically. Things to know about the free
 plans:
 
 - Render sleeps after 15 minutes without traffic; the next visit takes
   about a minute to wake it up.
+- Supabase's free plan includes 1 GB of file storage and about 5 GB of
+  downloads a month. Videos only download when a customer presses play;
+  15–60 second clips at 1080p (10–30 MB) keep you well inside the limits.
 - Supabase pauses a free project after about a week with no activity.
   Resume it from the Supabase dashboard if the app can't reach it.
 - Anyone with the URL can chat, and each chat is billed to your OpenRouter

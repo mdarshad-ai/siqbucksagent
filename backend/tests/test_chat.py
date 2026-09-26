@@ -48,7 +48,8 @@ def test_history_is_replayed_and_returned(client, fake_llm):
     sent = llm.requests[0]["messages"]
     assert sent[0]["role"] == "system"
     assert sent[1:] == history + [{"role": "user", "content": "Which is cheaper?"}]
-    assert res.json()["history"] == history + [
+    returned = [{"role": h["role"], "content": h["content"]} for h in res.json()["history"]]
+    assert returned == history + [
         {"role": "user", "content": "Which is cheaper?"},
         {"role": "assistant", "content": "The Ceylon one."},
     ]

@@ -1,12 +1,15 @@
 """Admin API: login, inventory, agent personas, and user management."""
 
+import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field, StringConstraints
 
 import auth
 import database
+import media
+import storage
 from agent_config import CORE_RULES
 from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat
 
@@ -148,7 +151,7 @@ class ItemFields(BaseModel):
 @router.get("/agents/{agent_id}/items")
 def list_items(agent_id: str, user: dict = Depends(auth.current_user)):
     _require_agent(agent_id)
-    return database.list_items(agent_id)
+    return database.list_items(agent_id, with_media_counts=True)
 
 
 @router.post("/agents/{agent_id}/items", status_code=201)
@@ -171,8 +174,212 @@ def update_item(
 @router.delete("/agents/{agent_id}/items/{item_id}", status_code=204)
 def delete_item(agent_id: str, item_id: int, user: dict = Depends(auth.current_user)):
     _require_agent(agent_id)
-    if not database.delete_item(agent_id, item_id):
+    removed = database.delete_item(agent_id, item_id)
+    if removed is None:
         raise HTTPException(status_code=404, detail="Stone not found")
+    _delete_files(removed)
+
+
+# ---------- media ----------
+
+def _require_item(agent_id: str, item_id: int):
+    _require_agent(agent_id)
+    item = database.get_item(agent_id, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Stone not found")
+    return item
+
+
+def _delete_files(rows):
+    paths = [p for r in rows for p in (r.get("path"), r.get("poster_path")) if p]
+    if paths:
+        storage.get_storage().delete(paths)
+
+
+def _check_uploaded(item_id: int, path: str | None):
+    """An uploaded path must belong to this stone and actually exist."""
+    if not path:
+        return
+    if not path.startswith(f"items/{item_id}/") or ".." in path:
+        raise HTTPException(status_code=400, detail="Invalid upload path")
+    try:
+        found = storage.get_storage().exists(path)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    if not found:
+        raise HTTPException(status_code=400, detail="Upload not found - please try again")
+
+
+class UploadRequest(BaseModel):
+    content_type: str
+    size_bytes: int = Field(gt=0)
+    purpose: Literal["media", "poster"] = "media"
+
+
+class MediaCreate(BaseModel):
+    path: str = Field(max_length=500)
+    content_type: str
+    size_bytes: int = Field(gt=0)
+    poster_path: str | None = Field(default=None, max_length=500)
+    caption: Text = Field(default="", max_length=300)
+
+
+class LinkCreate(BaseModel):
+    url: NonEmptyStr = Field(max_length=500)
+    caption: Text = Field(default="", max_length=300)
+
+
+class MediaUpdate(BaseModel):
+    caption: Text | None = Field(default=None, max_length=300)
+    poster_path: str | None = Field(default=None, max_length=500)
+
+
+class MediaOrder(BaseModel):
+    ids: list[int]
+
+
+@router.get("/agents/{agent_id}/items/{item_id}/media")
+def list_item_media(agent_id: str, item_id: int, user: dict = Depends(auth.current_user)):
+    _require_item(agent_id, item_id)
+    return [media.admin_media(m) for m in database.list_media(item_id)]
+
+
+@router.post("/agents/{agent_id}/items/{item_id}/media/upload-url")
+def create_upload_url(
+    agent_id: str, item_id: int, req: UploadRequest, user: dict = Depends(auth.current_user)
+):
+    """A short-lived URL the browser uploads one file to directly."""
+    _require_item(agent_id, item_id)
+    allowed = storage.IMAGE_TYPES if req.purpose == "poster" else storage.ALLOWED_TYPES
+    ext = allowed.get(req.content_type)
+    if not ext:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Use JPG, PNG or WebP photos, or MP4/MOV/WebM videos.",
+        )
+    if req.size_bytes > storage.MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="File is larger than 50 MB.")
+    path = f"items/{item_id}/{uuid.uuid4().hex}.{ext}"
+    try:
+        upload = storage.get_storage().create_upload(path, req.content_type)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {**upload, "path": path, "headers": {"Content-Type": req.content_type}}
+
+
+@router.put("/local-upload", include_in_schema=False)
+async def local_upload(token: str, request: Request):
+    """Upload target for LocalStorage (dev/tests). Authorised by the signed
+    token in the URL, like Supabase's signed upload URLs."""
+    store = storage.get_storage()
+    if not isinstance(store, storage.LocalStorage):
+        raise HTTPException(status_code=404)
+    try:
+        path, _ = store.read_upload_token(token)
+        body = [chunk async for chunk in request.stream()]
+        size = store.write(path, body)
+    except storage.StorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"path": path, "size_bytes": size}
+
+
+@router.post("/agents/{agent_id}/items/{item_id}/media", status_code=201)
+def add_uploaded_media(
+    agent_id: str, item_id: int, req: MediaCreate, user: dict = Depends(auth.current_user)
+):
+    _require_item(agent_id, item_id)
+    if req.content_type in storage.IMAGE_TYPES:
+        kind = "image"
+    elif req.content_type in storage.VIDEO_TYPES:
+        kind = "video"
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+    _check_uploaded(item_id, req.path)
+    if req.poster_path:
+        if kind != "video":
+            raise HTTPException(status_code=400, detail="Only videos have a still frame")
+        _check_uploaded(item_id, req.poster_path)
+    row = database.create_media(
+        item_id,
+        {
+            "kind": kind,
+            "path": req.path,
+            "poster_path": req.poster_path,
+            "content_type": req.content_type,
+            "size_bytes": req.size_bytes,
+            "caption": req.caption,
+        },
+    )
+    return media.admin_media(row)
+
+
+@router.post("/agents/{agent_id}/items/{item_id}/media/link", status_code=201)
+def add_video_link(
+    agent_id: str, item_id: int, req: LinkCreate, user: dict = Depends(auth.current_user)
+):
+    _require_item(agent_id, item_id)
+    parsed = media.parse_video_link(req.url)
+    if not parsed:
+        raise HTTPException(
+            status_code=400,
+            detail="That doesn't look like a YouTube or Vimeo video link.",
+        )
+    embed_url, thumbnail_url = parsed
+    row = database.create_media(
+        item_id,
+        {
+            "kind": "embed",
+            "external_url": embed_url,
+            "thumbnail_url": thumbnail_url,
+            "caption": req.caption,
+        },
+    )
+    return media.admin_media(row)
+
+
+@router.patch("/agents/{agent_id}/items/{item_id}/media/{media_id}")
+def update_media(
+    agent_id: str, item_id: int, media_id: int, req: MediaUpdate,
+    user: dict = Depends(auth.current_user),
+):
+    _require_item(agent_id, item_id)
+    row = database.get_media(item_id, media_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Media not found")
+    fields = {}
+    if req.caption is not None:
+        fields["caption"] = req.caption
+    if req.poster_path is not None:
+        if row["kind"] != "video":
+            raise HTTPException(status_code=400, detail="Only videos have a still frame")
+        _check_uploaded(item_id, req.poster_path)
+        fields["poster_path"] = req.poster_path
+    updated = database.update_media(item_id, media_id, fields) if fields else row
+    if "poster_path" in fields and row["poster_path"] and row["poster_path"] != req.poster_path:
+        storage.get_storage().delete([row["poster_path"]])
+    return media.admin_media(updated)
+
+
+@router.put("/agents/{agent_id}/items/{item_id}/media/order")
+def reorder_media(
+    agent_id: str, item_id: int, req: MediaOrder, user: dict = Depends(auth.current_user)
+):
+    _require_item(agent_id, item_id)
+    rows = database.reorder_media(item_id, req.ids)
+    if rows is None:
+        raise HTTPException(status_code=400, detail="The order must list each media item once.")
+    return [media.admin_media(m) for m in rows]
+
+
+@router.delete("/agents/{agent_id}/items/{item_id}/media/{media_id}", status_code=204)
+def delete_media(
+    agent_id: str, item_id: int, media_id: int, user: dict = Depends(auth.current_user)
+):
+    _require_item(agent_id, item_id)
+    row = database.delete_media(item_id, media_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Media not found")
+    _delete_files([row])
 
 
 # ---------- users (owners only) ----------
