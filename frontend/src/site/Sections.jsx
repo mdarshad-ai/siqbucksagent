@@ -83,7 +83,7 @@ export function Hero({ agents, onAsk, onTalk }) {
                 onClick={() => onTalk(a.id)}
               >
                 <span className="hero-arch" aria-hidden="true" />
-                <Character theme={a.theme} talking={false} active />
+                <Character theme={a.theme} variant={a.id} talking={false} active />
                 <span className="hero-partner-name">{a.display_name}</span>
                 <span className="hero-partner-stall">{a.stall_name}</span>
               </button>
@@ -111,7 +111,7 @@ export function Partners({ agents, onTalk, onAskPartner }) {
                 style={{ "--stall-accent": a.theme.accent, "--stall-glow": a.theme.glow }}
               >
                 <div className="partner-card-figure">
-                  <Character theme={a.theme} talking={false} active />
+                  <Character theme={a.theme} variant={a.id} talking={false} active />
                 </div>
                 <div className="partner-card-body">
                   <div className="partner-card-role">{copy.role}</div>
