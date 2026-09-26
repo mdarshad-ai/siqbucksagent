@@ -198,8 +198,9 @@ so inventory, personas and users survive restarts and redeploys.
    database password.
 
 3. For photos and videos, copy two more values:
-   - **Project URL**: Project Settings → Data API (e.g.
-     `https://abcdefgh.supabase.co`)
+   - **Project URL**: Project Settings → Data API, just the
+     `https://abcdefgh.supabase.co` part (anything after it, like
+     `/rest/v1`, is ignored)
    - **Secret key**: Project Settings → API Keys → create or copy a
      **secret** key (`sb_secret_…`), or use the legacy `service_role` key.
      It has full access, so it only ever goes into Render, never the
