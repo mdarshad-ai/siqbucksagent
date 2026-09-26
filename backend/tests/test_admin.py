@@ -264,3 +264,24 @@ def test_preview_uses_draft_without_publishing(client, owner, fake_llm):
     # Nothing was published.
     assert database.get_agent("siq")["persona"].startswith("You are Siq, the specialist")
     assert len(database.list_agent_versions("siq")) == 1
+
+
+def test_old_default_theme_is_moved_to_the_new_default(client):
+    import json
+
+    from sqlalchemy import update
+
+    from agent_config import DEFAULT_AGENTS, PREVIOUS_THEMES
+
+    old = PREVIOUS_THEMES["bucks"][0]
+    with database.get_engine().begin() as conn:
+        conn.execute(update(database.agents).where(database.agents.c.id == "bucks").values(theme=json.dumps(old)))
+    database.init_db()
+    assert database.get_agent("bucks")["theme"] == DEFAULT_AGENTS["bucks"]["theme"]
+
+    # A theme someone customised is left alone.
+    custom = {"accent": "#123456", "accent_dim": "#000000", "glow": "#abcdef"}
+    with database.get_engine().begin() as conn:
+        conn.execute(update(database.agents).where(database.agents.c.id == "bucks").values(theme=json.dumps(custom)))
+    database.init_db()
+    assert database.get_agent("bucks")["theme"] == custom

@@ -94,11 +94,17 @@ export default function Character({ theme, talking, active, variant }) {
         {/* face */}
         {face === "twin" ? (
           <g className="ai-eyes">
-            <path d="M66 96 L92 90 L92 102 L70 106 Z" fill={`url(#${id("visor")})`} />
-            <path d="M134 96 L108 90 L108 102 L130 106 Z" fill={`url(#${id("visor")})`} />
-            <path d="M66 96 L92 90 L92 102 L70 106 Z M134 96 L108 90 L108 102 L130 106 Z" fill={glow} filter={`url(#${id("blur")})`} opacity="0.7" />
-            <circle className="ai-pupil" cx="82" cy="97" r="3" fill="#fff" />
-            <circle className="ai-pupil" cx="118" cy="97" r="3" fill="#fff" />
+            {/* soft rounded eyes, outer corners lifted, for a friendly look */}
+            <g transform="rotate(8 79 97)">
+              <rect x="66" y="91" width="26" height="12" rx="6" fill={glow} filter={`url(#${id("blur")})`} opacity="0.7" />
+              <rect x="66" y="91" width="26" height="12" rx="6" fill={`url(#${id("visor")})`} />
+              <circle className="ai-pupil" cx="82" cy="96" r="2.6" fill="#fff" />
+            </g>
+            <g transform="rotate(-8 121 97)">
+              <rect x="108" y="91" width="26" height="12" rx="6" fill={glow} filter={`url(#${id("blur")})`} opacity="0.7" />
+              <rect x="108" y="91" width="26" height="12" rx="6" fill={`url(#${id("visor")})`} />
+              <circle className="ai-pupil" cx="118" cy="96" r="2.6" fill="#fff" />
+            </g>
           </g>
         ) : (
           <g className="ai-eyes">
@@ -109,8 +115,13 @@ export default function Character({ theme, talking, active, variant }) {
           </g>
         )}
 
+        {/* a gentle smile at rest; it gives way to the waveform while talking */}
+        {face === "twin" && (
+          <path className="ai-smile" d="M88 120 Q100 130 112 120" fill="none" stroke={glow} strokeWidth="2.6" strokeLinecap="round" />
+        )}
+
         {/* voice waveform: animates while talking */}
-        <g className="ai-wave" fill={glow}>
+        <g className={`ai-wave ${face === "twin" ? "ai-wave-hidden" : ""}`} fill={glow}>
           {[0, 1, 2, 3, 4].map((i) => (
             <rect key={i} className="ai-wave-bar" x={86 + i * 6} y="124" width="3" height="10" rx="1.5" />
           ))}

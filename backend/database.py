@@ -279,6 +279,7 @@ def init_db():
                         created_at=now, created_by="seed", **row,
                     )
                 )
+        _refresh_default_themes(conn)
         if conn.execute(select(func.count()).select_from(items)).scalar() == 0:
             now = _now()
             for agent_id, seed_items in agent_config.SEED_ITEMS.items():
@@ -290,6 +291,14 @@ def init_db():
                             created_at=now, updated_at=now, **item,
                         )
                     )
+
+
+def _refresh_default_themes(conn):
+    for agent_id, old_themes in agent_config.PREVIOUS_THEMES.items():
+        current = agent_config.DEFAULT_AGENTS.get(agent_id, {}).get("theme")
+        stored = conn.execute(select(agents.c.theme).where(agents.c.id == agent_id)).scalar()
+        if current and stored and json.loads(stored) in old_themes:
+            conn.execute(update(agents).where(agents.c.id == agent_id).values(theme=json.dumps(current)))
 
 
 # ---------- agents ----------

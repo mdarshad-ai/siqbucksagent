@@ -78,9 +78,9 @@ DEFAULT_AGENTS = {
         "stall_name": "Bucks' Exchange",
         "tagline": "Whatever's moving, from wherever he can get it.",
         "theme": {
-            "accent": "#C4472B",
-            "accent_dim": "#6E2418",
-            "glow": "#FFB199",
+            "accent": "#1E8A58",
+            "accent_dim": "#0F4A31",
+            "glow": "#86EFBF",
         },
         "persona": (
             "You are Bucks, running a fast-moving stone exchange. You deal in "
@@ -104,6 +104,12 @@ DEFAULT_AGENTS = {
 }
 
 AGENT_ORDER = list(DEFAULT_AGENTS)
+
+# Earlier default themes. A partner still using one of these is moved to the
+# current default on startup; a theme someone changed by hand is left alone.
+PREVIOUS_THEMES = {
+    "bucks": [{"accent": "#C4472B", "accent_dim": "#6E2418", "glow": "#FFB199"}],
+}
 
 
 BRAND_NAME = "Loupe Gem"
