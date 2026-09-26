@@ -1,4 +1,6 @@
+import logging
 import os
+from typing import Annotated, Literal
 
 from dotenv import load_dotenv
 
@@ -6,11 +8,13 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, StringConstraints
 
 import database
 from agent_config import get_agent, list_agents_public
 from llm_service import chat_with_agent, _get_api_key
+
+logger = logging.getLogger(__name__)
 
 database.init_db()
 
@@ -28,14 +32,19 @@ app.add_middleware(
 )
 
 
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
 class ChatMessage(BaseModel):
-    role: str
+    # Only plain conversation turns - a client must not be able to inject its
+    # own "system" (or "tool") messages alongside the agent's system prompt.
+    role: Literal["user", "assistant"]
     content: str
 
 
 class ChatRequest(BaseModel):
     agent_id: str
-    message: str
+    message: NonEmptyStr
     history: list[ChatMessage] = []
 
 
@@ -77,6 +86,13 @@ def chat(req: ChatRequest):
     history_dicts = [h.model_dump() for h in req.history]
     try:
         reply, updated_history = chat_with_agent(req.agent_id, req.message, history_dicts)
-    except Exception as exc:  # surface OpenRouter/model errors clearly instead of a bare 500
-        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception:
+        # Log the full upstream error server-side; the raw OpenRouter/provider
+        # message can contain request ids and account details, so the client
+        # only gets a generic error.
+        logger.exception("Chat request to the model failed")
+        raise HTTPException(
+            status_code=502,
+            detail="The agent couldn't reply right now. Please try again.",
+        )
     return ChatResponse(reply=reply, history=updated_history)

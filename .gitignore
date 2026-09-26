@@ -11,3 +11,5 @@ backend/*.token
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+backend/.pytest_cache/
+backend/tests/__pycache__/
