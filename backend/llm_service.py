@@ -5,7 +5,7 @@ from pathlib import Path
 from openai import OpenAI
 
 import database
-from agent_config import get_agent
+from agent_config import compose_system_prompt
 
 DEFAULT_MODEL = "anthropic/claude-sonnet-4.5"
 
@@ -17,16 +17,18 @@ TOOLS = [
         "function": {
             "name": "search_inventory",
             "description": (
-                "Search this agent's own inventory by keyword (matches item "
-                "name, description, or category). Returns matching items with "
-                "id, name, description, price, quantity, and category."
+                "Search this agent's own inventory by keywords (matches name, "
+                "category, description, origin, color, cut, and story). An "
+                "empty query lists everything. Returns a summary of each "
+                "matching stone: id, name, category, carat, cut, color, "
+                "origin, price, quantity, and status."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Keyword to search for, e.g. 'sapphire' or 'quartz'.",
+                        "description": "Keywords, e.g. 'sapphire', 'blue oval', or '' for everything.",
                     }
                 },
                 "required": ["query"],
@@ -37,7 +39,10 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_item_details",
-            "description": "Get full details for one item in this agent's inventory by its id.",
+            "description": (
+                "Get full details for one stone by its id, including its "
+                "story (shareable) and private sales guidance."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -93,17 +98,27 @@ def _extra_headers():
     return headers
 
 
+SEARCH_SUMMARY_FIELDS = (
+    "id", "name", "category", "carat", "cut", "color", "origin", "price",
+    "quantity", "status",
+)
+DETAIL_FIELDS = database.ITEM_PUBLIC_FIELDS + ("story", "sales_guidance")
+
+
 def _run_tool(agent_id: str, tool_name: str, tool_args: dict):
     if tool_name == "search_inventory":
-        results = database.search_inventory(agent_id, tool_args.get("query", ""))
-        return json.dumps({"results": results})
+        results = database.search_items(agent_id, tool_args.get("query", ""))
+        summaries = [{k: r[k] for k in SEARCH_SUMMARY_FIELDS} for r in results]
+        return json.dumps({"results": summaries})
     if tool_name == "get_item_details":
         item = database.get_item(agent_id, tool_args.get("item_id"))
-        return json.dumps({"item": item} if item else {"error": "not found"})
+        if not item:
+            return json.dumps({"error": "not found"})
+        return json.dumps({"item": {k: item[k] for k in DETAIL_FIELDS}})
     return json.dumps({"error": f"unknown tool {tool_name}"})
 
 
-def chat_with_agent(agent_id: str, message: str, history: list[dict]):
+def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_override=None):
     """
     history: list of {"role": "user"|"assistant", "content": str} from prior
     turns (plain text only - this is what the frontend stores and replays).
@@ -111,8 +126,14 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict]):
     Returns: (reply_text, updated_history) where updated_history is the same
     plain-text shape with this turn appended. Any tool-call exchange happens
     only within this single call and is not persisted.
+
+    agent_override: optional dict with persona/selling_rules to use instead of
+    the published ones (the admin "preview" chat). Tools still run against
+    agent_id's real inventory.
     """
-    agent = get_agent(agent_id)
+    agent = database.get_agent(agent_id)
+    if agent and agent_override:
+        agent = {**agent, **agent_override}
     if not agent:
         raise ValueError(f"Unknown agent_id: {agent_id}")
 
@@ -126,7 +147,7 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict]):
 
     plain_history = [{"role": h["role"], "content": h["content"]} for h in history]
 
-    messages = [{"role": "system", "content": agent["system_prompt"]}]
+    messages = [{"role": "system", "content": compose_system_prompt(agent)}]
     messages.extend(plain_history)
     messages.append({"role": "user", "content": message})
 
@@ -134,7 +155,7 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict]):
 
     client = _get_client()
 
-    for _ in range(5):
+    for _ in range(8):  # search + details for a few stones
         response = client.chat.completions.create(
             model=model,
             messages=messages,

@@ -90,10 +90,10 @@ def test_upstream_errors_are_not_leaked(client, fake_llm):
 
 
 def test_missing_api_key_is_500(client, fake_llm, monkeypatch):
-    import main
+    import chat_core
 
     fake_llm()
-    monkeypatch.setattr(main, "_get_api_key", lambda: None)
+    monkeypatch.setattr(chat_core, "_get_api_key", lambda: None)
 
     res = post_chat(client, agent_id="siq", message="hi")
 

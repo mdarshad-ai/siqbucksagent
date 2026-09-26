@@ -57,12 +57,14 @@ python3 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
-# edit .env: set OPENROUTER_API_KEY (or OPENROUTER_API_KEY_FILE)
+# edit .env: set OPENROUTER_API_KEY (or OPENROUTER_API_KEY_FILE),
+# and ADMIN_EMAIL / ADMIN_PASSWORD for your /admin login
 uvicorn main:app --reload --port 8000
 ```
 
-The first run creates `inventory.db` next to `main.py` and seeds it with
-both agents' items automatically. Visit http://localhost:8000/api/agents
+The first run creates `inventory.db` (SQLite) next to `main.py` and seeds
+it with both agents and their items automatically. Delete that file to
+start over. Visit http://localhost:8000/api/agents
 to sanity check.
 
 ### Frontend
@@ -88,29 +90,52 @@ pytest
 
 ## 3. How it works
 
-- `backend/agent_config.py` — each agent's persona (system prompt) and
-  visual theme (colors, used by the frontend).
-- `backend/database.py` — SQLite schema + seed data + query helpers, one
-  `inventory` table with an `agent_id` column (`siq` / `bucks`).
+- `backend/agent_config.py` — the locked **core rules** every agent follows
+  (check inventory with tools, never invent prices, keep sales guidance
+  private), plus the default personas and starting inventory used to seed
+  an empty database.
+- `backend/database.py` — SQLAlchemy tables for `agents` (editable persona
+  and selling style), `agent_versions` (publish history), `items` (the
+  inventory, including each stone's story and private sales guidance) and
+  `users` (admin logins). SQLite locally, Postgres (Supabase) in production.
 - `backend/llm_service.py` — the OpenRouter call, using the OpenAI-compatible
-  SDK pointed at `https://openrouter.ai/api/v1`. Each agent is given two
-  tools, `search_inventory` and `get_item_details`, implemented to only ever
-  query *that agent's own* rows — this is what stops an agent from
-  inventing stock or "seeing" the other agent's items.
-- `backend/main.py` — three endpoints: `GET /api/agents`,
-  `GET /api/agents/{id}/inventory`, `POST /api/chat`.
+  SDK pointed at `https://openrouter.ai/api/v1`. The system prompt is the
+  agent's persona + selling style + core rules. Each agent has two tools,
+  `search_inventory` and `get_item_details`, which only ever query *that
+  agent's own* stones; `get_item_details` also returns the stone's story and
+  sales guidance.
+- `backend/main.py` — public endpoints: `GET /api/agents`,
+  `GET /api/agents/{id}/inventory` (never includes story or guidance),
+  `POST /api/chat`.
+- `backend/admin_api.py` + `backend/auth.py` — the `/api/admin` endpoints
+  and logins behind the admin page.
 - Conversation history is kept client-side and replayed on every request
-  (stateless backend) — simplest thing that works for a demo. Swap this for
-  a session id + a `conversations` table if you want real persistence.
-- `frontend/src/components/Character.jsx` — the animated SVG dealer figure
-  (idle bob + lantern flicker always; a talking-mouth + glow pulse while
-  waiting for a reply).
+  (stateless backend) — simplest thing that works for a demo.
+- `frontend/src/admin/` — the admin page at `/admin`.
+- `frontend/src/components/Character.jsx` — the animated SVG dealer figure.
 
-## 4. Add or change inventory
+## 4. Admin page: inventory, personas and users
 
-Edit `SIQ_ITEMS` / `BUCKS_ITEMS` in `backend/database.py` and delete the
-existing `inventory.db` file (it's only seeded when the table is empty), or
-add a small admin script if you want to edit it without restarting.
+Open `/admin` (locally: http://localhost:5173/admin). The first owner account
+is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
+
+- **Inventory** (owners and staff): add, edit and delete each dealer's
+  stones — price, stock, status (available / reserved / sold), carat, cut,
+  colour, clarity, origin, treatment and certification — plus the stone's
+  memory:
+  - **Story**: things the dealer may tell customers (provenance, what makes
+    it special, who it suits).
+  - **Sales guidance**: private coaching the dealer follows but never
+    quotes. Don't put real secrets here (like a floor price): an AI can
+    sometimes be talked into revealing its instructions.
+- **Agents** (owners only): edit each dealer's name, stall, tagline,
+  persona and selling style. Test a draft in the preview chat (real
+  inventory, customers don't see it), then **Publish**. Every publish is
+  kept in the history and can be loaded back. The core rules are shown
+  read-only and always apply.
+- **Users** (owners only): add owners or staff. A new user gets a one-time
+  temporary password (shown once) and must choose their own at first login.
+  Owners can change roles, reset passwords and remove users.
 
 ## 5. Deploy — Railway (paid after a trial)
 
@@ -141,28 +166,48 @@ Push this whole folder to a GitHub repo, then in Railway:
 4. Deploy. Then go back to the backend service and set `FRONTEND_ORIGIN` to
    this frontend's public URL, and redeploy the backend so CORS allows it.
 
-## 6. Deploy — Render (free)
+## 6. Deploy — Render + Supabase (free)
 
 `render.yaml` and the root `Dockerfile` deploy the whole app as **one free
-web service**: the Docker build compiles the React frontend and the FastAPI
-backend serves it alongside `/api`, so there's a single URL and no CORS or
-`VITE_API_URL` to wire up.
+Render web service** (the FastAPI backend serves the built React frontend
+alongside `/api`). The data lives in a free **Supabase** Postgres database,
+so inventory, personas and users survive restarts and redeploys.
+
+**1. Supabase**
+
+1. Create a project at https://supabase.com (free). Save the database
+   password you choose.
+2. Click **Connect** at the top of the project, and copy the
+   **Session pooler** connection string. (Not "Direct connection": Render
+   can't reach that one.) Replace `[YOUR-PASSWORD]` in it with your
+   database password.
+
+The tables and the starting inventory are created automatically on the
+app's first start.
+
+**2. Render**
 
 1. Sign up at https://render.com (no credit card needed) and connect GitHub.
 2. New → **Blueprint** → pick this repo. Render reads `render.yaml`.
-3. When prompted, paste your `OPENROUTER_API_KEY`, then click **Apply**.
-4. Wait for the first build (a few minutes). Your app is at the service's
-   `https://….onrender.com` URL, shown on its dashboard page.
+3. Fill in the values it asks for:
+   - `OPENROUTER_API_KEY` — your OpenRouter key
+   - `DATABASE_URL` — the Supabase connection string from above
+   - `ADMIN_EMAIL` / `ADMIN_PASSWORD` — your first owner login (password
+     at least 10 characters)
+4. **Apply** and wait for the build. The shop is at the service's
+   `https://….onrender.com` URL, and the admin page at `/admin`.
 
-Every push to `main` redeploys automatically. To change the model, edit
-`OPENROUTER_MODEL` in `render.yaml` or on the service's Environment page.
+If the service already exists, add `DATABASE_URL`, `ADMIN_EMAIL`,
+`ADMIN_PASSWORD` and `ADMIN_JWT_SECRET` (any long random string) on its
+**Environment** page instead, then redeploy.
 
-Things to know about the free plan:
+Every push to `main` redeploys automatically. Things to know about the free
+plans:
 
-- The service sleeps after 15 minutes without traffic; the next visit takes
-  about a minute to wake it up. That's expected, not a bug.
-- The disk isn't persistent, but that doesn't matter here: `inventory.db` is
-  re-created and re-seeded on every start.
+- Render sleeps after 15 minutes without traffic; the next visit takes
+  about a minute to wake it up.
+- Supabase pauses a free project after about a week with no activity.
+  Resume it from the Supabase dashboard if the app can't reach it.
 - Anyone with the URL can chat, and each chat is billed to your OpenRouter
   account. Set a credit limit on the key in OpenRouter to cap spend.
 
@@ -172,6 +217,5 @@ Things to know about the free plan:
   way to run up a bill).
 - Move conversation history server-side (session cookie + table) instead of
   trusting the client to send it back honestly.
-- Add basic input length limits on the chat endpoint.
 - Never commit your token file or `.env` — both are already in
   `backend/.gitignore`.

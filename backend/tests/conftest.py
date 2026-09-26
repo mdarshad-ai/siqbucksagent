@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,17 +12,64 @@ import database  # noqa: E402
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    # Point the app at a throwaway DB and a dummy key before importing main,
-    # which seeds the DB at import time.
-    monkeypatch.setattr(database, "DB_PATH", tmp_path / "inventory.db")
+    # A fresh database per test, and a dummy key, before importing main
+    # (which initialises the DB at import time). SQLite by default; set
+    # TEST_DATABASE_URL to run against Postgres (its tables are wiped).
+    pg_url = os.environ.get("TEST_DATABASE_URL")
+    monkeypatch.setenv("DATABASE_URL", pg_url or f"sqlite:///{tmp_path / 'test.db'}")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setenv("ADMIN_JWT_SECRET", "test-secret")
+    database.reset_engine()
+    if pg_url:
+        database.metadata.drop_all(database.get_engine())
     database.init_db()
+
+    import auth
+
+    auth._failed_logins.clear()
 
     from fastapi.testclient import TestClient
 
     import main
 
-    return TestClient(main.app)
+    yield TestClient(main.app)
+    database.reset_engine()
+
+
+OWNER_EMAIL = "owner@example.com"
+OWNER_PASSWORD = "owner-password-1"
+
+
+@pytest.fixture
+def owner(client):
+    """Headers for a logged-in owner."""
+    import auth
+
+    database.create_user(
+        OWNER_EMAIL, auth.hash_password(OWNER_PASSWORD), "owner", must_change_password=False
+    )
+    res = client.post(
+        "/api/admin/login", json={"email": OWNER_EMAIL, "password": OWNER_PASSWORD}
+    )
+    return {"Authorization": f"Bearer {res.json()['token']}"}
+
+
+@pytest.fixture
+def staff(client, owner):
+    """Headers for a logged-in staff user who has set their own password."""
+    created = client.post(
+        "/api/admin/users", json={"email": "staff@example.com", "role": "staff"}, headers=owner
+    ).json()
+    token = client.post(
+        "/api/admin/login",
+        json={"email": "staff@example.com", "password": created["temp_password"]},
+    ).json()["token"]
+    token = client.post(
+        "/api/admin/me/password",
+        json={"current_password": created["temp_password"], "new_password": "staff-password-1"},
+        headers={"Authorization": f"Bearer {token}"},
+    ).json()["token"]
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _tool_call(call_id, name, arguments):
