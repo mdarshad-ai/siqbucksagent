@@ -136,7 +136,7 @@ export default function App() {
       {showFloat && !counterId && agents.length > 0 && (
         <button className="float-talk" onClick={() => openCounter()}>
           <span className="float-talk-dot" aria-hidden="true" />
-          Talk to a partner
+          Talk to an AI partner
         </button>
       )}
 

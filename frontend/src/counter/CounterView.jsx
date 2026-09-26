@@ -101,7 +101,7 @@ export default function CounterView({
           <LogoMark size={26} />
           <span>Loupe Gem</span>
         </span>
-        <div className="counter-switch" role="tablist" aria-label="Choose a partner">
+        <div className="counter-switch" role="tablist" aria-label="Choose an AI partner">
           {agents.map((a) => (
             <button
               key={a.id}

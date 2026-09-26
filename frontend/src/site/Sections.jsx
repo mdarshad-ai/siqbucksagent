@@ -32,7 +32,7 @@ export function SiteHeader({ onTalk }) {
           <a href="#how">How it works</a>
         </nav>
         <button className="btn-gold btn-small" onClick={() => onTalk()}>
-          Talk to a partner
+          Talk to an AI partner
         </button>
       </div>
     </header>
@@ -99,7 +99,7 @@ export function Partners({ agents, onTalk, onAskPartner }) {
   return (
     <section className="section" id="partners">
       <div className="site-container">
-        <p className="eyebrow">Meet your partners</p>
+        <p className="eyebrow">Meet your AI partners</p>
         <h2 className="section-title">Two counters, two kinds of expertise</h2>
         <div className="partner-grid">
           {agents.map((a) => {

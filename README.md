@@ -18,9 +18,9 @@ frontend/    React (Vite): the Loupe Gem site, the chat, and /admin
 
 - **Homepage**: a hero with one "just ask" box (the question is routed to
   the best-suited partner by a cheap keyword/inventory match, no AI call),
-  *Meet your partners* with sample questions, *On the counter tonight*
+  *Meet your AI partners* with sample questions, *On the counter tonight*
   (stones the shop features from /admin), how it works, and a closing ask
-  box. A floating *Talk to a partner* button follows you down the page.
+  box. A floating *Talk to an AI partner* button follows you down the page.
 - **The counter**: chatting opens a full-screen counter — the partner stands
   in a lit arch on the left (talking while they reply), the conversation on
   the right; on phones it becomes a compact header above the chat. Replies
