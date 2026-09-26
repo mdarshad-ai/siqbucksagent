@@ -31,9 +31,11 @@ def client(tmp_path, monkeypatch):
 
     import auth
     import limits
+    import reservations
 
     auth._failed_logins.clear()
     limits.reset_memory()
+    reservations._last_sweep["at"] = 0.0
 
     from fastapi.testclient import TestClient
 

@@ -66,7 +66,14 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "item_id": {"type": "integer", "description": "The stone's id."}
+                    "item_id": {"type": "integer", "description": "The stone's id."},
+                    "suggest_reserve": {
+                        "type": "boolean",
+                        "description": (
+                            "True when the customer seems keen to buy, to "
+                            "highlight the card's 'Reserve this stone' button."
+                        ),
+                    },
                 },
                 "required": ["item_id"],
             },
@@ -145,11 +152,13 @@ def _run_tool(agent_id: str, tool_name: str, tool_args: dict, shown: list | None
         if item["status"] == "sold" or item["quantity"] <= 0:
             return json.dumps({"error": "sold out - don't show or recommend it"})
         shown = shown if shown is not None else []
-        if any(card["id"] == item["id"] for card in shown):
+        if any(c["id"] == item["id"] for c in shown):
             return json.dumps({"ok": True, "note": "already shown"})
         if len(shown) >= MAX_CARDS_PER_REPLY:
             return json.dumps({"error": f"at most {MAX_CARDS_PER_REPLY} cards per reply"})
-        shown.append(stone_card(item))
+        card = stone_card(item)
+        card["suggest_reserve"] = bool(tool_args.get("suggest_reserve")) and item["status"] == "available"
+        shown.append(card)
         return json.dumps({"ok": True, "media_count": len(shown[-1]["media"])})
     return json.dumps({"error": f"unknown tool {tool_name}"})
 
@@ -189,6 +198,9 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_over
     messages.append({"role": "user", "content": message})
 
     reply_text = "Sorry, I'm having trouble looking that up right now."
+    # Some models say their piece alongside a tool call and then finish with
+    # an empty message, so keep any text they produce along the way.
+    interim_text = []
 
     client = _get_client()
     cards = []
@@ -204,8 +216,17 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_over
         msg = choice.message
 
         if not msg.tool_calls:
-            reply_text = (msg.content or "").strip()
+            final = (msg.content or "").strip()
+            if final:
+                reply_text = final
+            elif interim_text:
+                reply_text = "\n\n".join(interim_text)
+            elif cards:
+                reply_text = "Have a look at this one below."
             break
+
+        if (msg.content or "").strip():
+            interim_text.append(msg.content.strip())
 
         # Record the assistant's tool-call turn, then run each tool and feed
         # results back in as "tool" role messages.

@@ -62,3 +62,37 @@ export async function sendChatMessage(agentId, message, history) {
 export function assetUrl(url) {
   return url && url.startsWith("/") ? `${API_URL}${url}` : url;
 }
+
+export async function requestReservation(body) {
+  const res = await fetch(`${API_URL}/api/reservations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Visitor-Id": getVisitorId() },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.detail;
+    const message = Array.isArray(detail)
+      ? "Please check the form: " + detail.map((d) => d.loc?.[d.loc.length - 1]).join(", ")
+      : detail || "Couldn't send your request. Please try again.";
+    throw new Error(message);
+  }
+  return data;
+}
+
+// Remember which stones this browser has already asked to reserve.
+const REQUESTED_KEY = "gem-requested";
+export function getRequested() {
+  try {
+    return JSON.parse(localStorage.getItem(REQUESTED_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+export function rememberRequested(stoneKey, reference) {
+  try {
+    localStorage.setItem(REQUESTED_KEY, JSON.stringify({ ...getRequested(), [stoneKey]: reference }));
+  } catch {
+    // Not critical - the button just won't remember after a reload.
+  }
+}

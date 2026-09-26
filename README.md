@@ -143,6 +143,17 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
   photos (tap for full screen), videos that play in place, price, stock and
   key details. Sold-out stones never get a card, and there are at most three
   cards per reply.
+- **Reserve this stone**: every stone card in the chat has a *Reserve this
+  stone* button (dealers highlight it when a customer is keen). Customers
+  send their name, email, optional phone and note, and can choose to
+  include their chat. A request never changes stock by itself.
+- **Requests** (owners and staff): waiting requests show with a count badge.
+  *Confirm hold* marks a one-off stone as reserved (or sets one unit aside
+  when there are several) for a number of days, so the dealers tell other
+  customers it's on hold. Holds can be extended, released, or marked sold,
+  and expire automatically. Closed requests, with the customer's details,
+  are deleted after 90 days. Requests are limited to 3 per visitor per day,
+  with a hidden spam trap.
 - **Agents** (owners only): edit each dealer's name, stall, tagline,
   persona and selling style. Test a draft in the preview chat (real
   inventory, customers don't see it), then **Publish**. Every publish is

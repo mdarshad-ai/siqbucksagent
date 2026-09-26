@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sendChatMessage } from "../api.js";
+import RichText from "./RichText.jsx";
 import StoneCard from "./StoneCard.jsx";
 
 function waitText(seconds) {
@@ -74,11 +75,13 @@ export default function ChatPanel({ agent, history, setHistory, onTalkingChange 
         )}
         {history.map((turn, i) => (
           <div key={i} className={`chat-turn chat-turn-${turn.role}`}>
-            <div className={`chat-bubble chat-bubble-${turn.role}`}>{turn.content}</div>
+            <div className={`chat-bubble chat-bubble-${turn.role}`}>
+              {turn.role === "assistant" ? <RichText text={turn.content} /> : turn.content}
+            </div>
             {turn.cards?.length > 0 && (
               <div className="stone-cards">
                 {turn.cards.map((card) => (
-                  <StoneCard key={card.id} card={card} />
+                  <StoneCard key={card.id} card={card} getTranscript={() => history} />
                 ))}
               </div>
             )}

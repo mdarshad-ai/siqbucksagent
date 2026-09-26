@@ -10,6 +10,7 @@ import auth
 import database
 import limits
 import media
+import reservations
 import storage
 from agent_config import CORE_RULES
 from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat
@@ -152,6 +153,7 @@ class ItemFields(BaseModel):
 @router.get("/agents/{agent_id}/items")
 def list_items(agent_id: str, user: dict = Depends(auth.current_user)):
     _require_agent(agent_id)
+    reservations.sweep()
     return database.list_items(agent_id, with_media_counts=True)
 
 
@@ -467,3 +469,79 @@ def usage(user: dict = Depends(auth.require_owner)):
 def update_limits(req: LimitSettings, user: dict = Depends(auth.require_owner)):
     values = {k: v for k, v in req.model_dump().items() if v is not None}
     return limits.update_settings(values, user["email"])
+
+
+# ---------- reservation requests (owners and staff) ----------
+
+STATUS_GROUPS = {
+    "pending": ("pending",),
+    "active": ("confirmed",),
+    "closed": ("declined", "cancelled", "completed", "expired"),
+}
+
+
+class HoldRequest(BaseModel):
+    hold_days: int = Field(default=reservations.DEFAULT_HOLD_DAYS, ge=1, le=30)
+
+
+class ExtendRequest(BaseModel):
+    extra_days: int = Field(ge=1, le=30)
+
+
+class ReservationNote(BaseModel):
+    admin_note: Text = Field(max_length=2000)
+
+
+@router.get("/reservations/summary")
+def reservation_summary(user: dict = Depends(auth.current_user)):
+    reservations.sweep()
+    return {"pending": database.count_reservations("pending")}
+
+
+@router.get("/reservations")
+def list_reservations(
+    group: Literal["pending", "active", "closed"] = "pending",
+    user: dict = Depends(auth.current_user),
+):
+    reservations.sweep()
+    rows = database.list_reservations(STATUS_GROUPS[group])
+    return [reservations.admin_view(r) for r in rows]
+
+
+@router.post("/reservations/{reservation_id}/confirm")
+def confirm_reservation(
+    reservation_id: int, req: HoldRequest, user: dict = Depends(auth.current_user)
+):
+    return reservations.admin_view(reservations.confirm(reservation_id, req.hold_days, user["email"]))
+
+
+@router.post("/reservations/{reservation_id}/extend")
+def extend_reservation(
+    reservation_id: int, req: ExtendRequest, user: dict = Depends(auth.current_user)
+):
+    return reservations.admin_view(reservations.extend(reservation_id, req.extra_days, user["email"]))
+
+
+@router.post("/reservations/{reservation_id}/decline")
+def decline_reservation(reservation_id: int, user: dict = Depends(auth.current_user)):
+    return reservations.admin_view(reservations.decline(reservation_id, user["email"]))
+
+
+@router.post("/reservations/{reservation_id}/release")
+def release_reservation(reservation_id: int, user: dict = Depends(auth.current_user)):
+    return reservations.admin_view(reservations.release(reservation_id, user["email"]))
+
+
+@router.post("/reservations/{reservation_id}/complete")
+def complete_reservation(reservation_id: int, user: dict = Depends(auth.current_user)):
+    return reservations.admin_view(reservations.complete(reservation_id, user["email"]))
+
+
+@router.patch("/reservations/{reservation_id}")
+def update_reservation_note(
+    reservation_id: int, req: ReservationNote, user: dict = Depends(auth.current_user)
+):
+    if not database.get_reservation(reservation_id):
+        raise HTTPException(status_code=404, detail="Request not found")
+    updated = database.update_reservation(reservation_id, {"admin_note": req.admin_note})
+    return reservations.admin_view(updated)
