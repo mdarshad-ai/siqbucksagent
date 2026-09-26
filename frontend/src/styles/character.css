@@ -137,6 +137,24 @@
   transition: transform 0.3s, opacity 0.3s;
 }
 
+/* Faces with a smile show the waveform only while talking. */
+.ai-wave-hidden,
+.ai-smile {
+  transition: opacity 0.25s;
+}
+
+.ai-wave-hidden {
+  opacity: 0;
+}
+
+.is-talking .ai-wave-hidden {
+  opacity: 1;
+}
+
+.is-talking .ai-smile {
+  opacity: 0;
+}
+
 .is-talking .ai-wave-bar {
   opacity: 1;
   animation: ai-voice 0.7s ease-in-out infinite;
