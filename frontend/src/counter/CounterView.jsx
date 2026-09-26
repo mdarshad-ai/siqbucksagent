@@ -126,7 +126,7 @@ export default function CounterView({
       <div className="counter-body">
         <aside className="counter-stage">
           <div className="counter-plinth">
-            <Character theme={agent.theme} talking={busy} active />
+            <Character theme={agent.theme} variant={agent.id} talking={busy} active />
             <div className="counter-stage-text">
               <h2>{agent.display_name}</h2>
               <div className="counter-stall">{agent.stall_name}</div>

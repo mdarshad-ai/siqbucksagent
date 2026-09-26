@@ -1,4 +1,4 @@
-/* The animated partner figure (components/Character.jsx). */
+/* The AI partner avatar (components/Character.jsx). */
 
 /* Size with --char-size (the figure's width). */
 .character {
@@ -14,7 +14,7 @@
 
 .character-glow {
   position: absolute;
-  inset: -16%;
+  inset: -12%;
   border-radius: 50%;
   opacity: 0.35;
   transition: opacity 0.3s ease;
@@ -26,64 +26,159 @@
 }
 
 .character-figure {
-  width: 93%;
-  height: 94%;
-  animation: idle-bob 3.6s ease-in-out infinite;
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.45));
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: ai-float 5s ease-in-out infinite;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.55));
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .character-figure,
-  .lantern,
-  .is-talking .character-mouth,
-  .is-talking .character-glow {
-    animation: none !important;
-  }
-}
-
-@keyframes idle-bob {
+@keyframes ai-float {
   0%,
   100% {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-4px);
+    transform: translateY(-5px);
   }
 }
 
-.lantern {
-  animation: lantern-flicker 2.4s ease-in-out infinite;
-  transform-origin: 100px 34px;
+/* SVG parts rotate/scale around their own centre. */
+.ai-orbit,
+.ai-core,
+.ai-core-glow,
+.ai-wave-bar {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
-@keyframes lantern-flicker {
+.ai-orbit {
+  animation: ai-orbit 9s linear infinite;
+  opacity: 0.9;
+}
+
+/* A flat ellipse "spins" by sliding its dash pattern and bobbing its tilt. */
+.ai-orbit ellipse {
+  animation: ai-dash 6s linear infinite;
+}
+
+@keyframes ai-orbit {
   0%,
   100% {
-    opacity: 1;
+    transform: rotate(-8deg);
   }
-  45% {
-    opacity: 0.75;
-  }
-  60% {
-    opacity: 1;
+  50% {
+    transform: rotate(8deg);
   }
 }
 
-.character-mouth {
-  transform-origin: 100px 102px;
+@keyframes ai-dash {
+  to {
+    stroke-dashoffset: -100;
+  }
 }
 
-.is-talking .character-mouth {
-  animation: mouth-talk 0.42s ease-in-out infinite;
+.ai-scan {
+  animation: ai-scan 3.2s ease-in-out infinite;
 }
 
-@keyframes mouth-talk {
+@keyframes ai-scan {
   0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(58px);
+  }
+}
+
+.ai-pupil {
+  animation: ai-blink 5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes ai-blink {
+  0%,
+  92%,
   100% {
     transform: scaleY(1);
   }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+.ai-core-glow {
+  animation: ai-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes ai-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
   50% {
-    transform: scaleY(1.8);
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+.ai-circuit {
+  stroke-dasharray: 4 3;
+  animation: ai-dash 4s linear infinite;
+}
+
+/* Voice waveform: a quiet line at rest, live bars while talking. */
+.ai-wave-bar {
+  transform: scaleY(0.25);
+  opacity: 0.55;
+  transition: transform 0.3s, opacity 0.3s;
+}
+
+.is-talking .ai-wave-bar {
+  opacity: 1;
+  animation: ai-voice 0.7s ease-in-out infinite;
+}
+
+.is-talking .ai-wave-bar:nth-child(2) {
+  animation-delay: -0.15s;
+}
+
+.is-talking .ai-wave-bar:nth-child(3) {
+  animation-delay: -0.35s;
+}
+
+.is-talking .ai-wave-bar:nth-child(4) {
+  animation-delay: -0.5s;
+}
+
+.is-talking .ai-wave-bar:nth-child(5) {
+  animation-delay: -0.25s;
+}
+
+@keyframes ai-voice {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1.25);
+  }
+}
+
+.is-talking .ai-eyes {
+  animation: ai-glow 0.9s ease-in-out infinite;
+}
+
+@keyframes ai-glow {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.45);
   }
 }
 
@@ -98,8 +193,26 @@
     transform: scale(1);
   }
   50% {
-    opacity: 0.85;
+    opacity: 0.9;
     transform: scale(1.08);
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .character-figure,
+  .ai-orbit,
+  .ai-orbit ellipse,
+  .ai-scan,
+  .ai-pupil,
+  .ai-core-glow,
+  .ai-circuit,
+  .is-talking .ai-wave-bar,
+  .is-talking .ai-eyes,
+  .is-talking .character-glow {
+    animation: none !important;
+  }
+
+  .is-talking .ai-wave-bar {
+    transform: scaleY(0.8);
+  }
+}
