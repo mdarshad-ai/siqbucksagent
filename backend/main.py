@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import admin_api
 import auth
 import database
+import limits
 import storage
 from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat
 
@@ -34,6 +35,7 @@ if os.environ.get("RENDER") and not os.environ.get("SUPABASE_URL"):
     )
 database.init_db()
 auth.bootstrap_owner()
+limits.prune_old_counters()
 try:
     storage.get_storage().ensure_ready()
 except storage.StorageError:
@@ -82,9 +84,10 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, request: Request):
     if not database.get_agent(req.agent_id):
         raise HTTPException(status_code=404, detail="Unknown agent")
+    limits.check_chat_allowed(request)
     return run_chat(req.agent_id, req.message, req.history)
 
 

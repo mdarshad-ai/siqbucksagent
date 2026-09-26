@@ -30,8 +30,10 @@ def client(tmp_path, monkeypatch):
     database.init_db()
 
     import auth
+    import limits
 
     auth._failed_logins.clear()
+    limits.reset_memory()
 
     from fastapi.testclient import TestClient
 

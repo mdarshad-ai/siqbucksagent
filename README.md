@@ -148,6 +148,12 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
   inventory, customers don't see it), then **Publish**. Every publish is
   kept in the history and can be loaded back. The core rules are shown
   read-only and always apply.
+- **Settings** (owners only): chat usage today and over the last 7 days,
+  and the chat limits that protect your OpenRouter bill: a short-burst
+  limit and a daily limit per visitor (shared IPs get 3x), a daily cap for
+  the whole shop, and how many past messages are sent to the AI with each
+  question. Customers who hit a limit get a friendly message in the
+  dealer's voice. Counts reset at midnight UTC.
 - **Users** (owners only): add owners or staff. A new user gets a one-time
   temporary password (shown once) and must choose their own at first login.
   Owners can change roles, reset passwords and remove users.
@@ -242,8 +248,6 @@ plans:
 
 ## 7. Things to harden before showing this to anyone else
 
-- Rate-limit `/api/chat` (a public chat box wired to a paid API is an easy
-  way to run up a bill).
 - Move conversation history server-side (session cookie + table) instead of
   trusting the client to send it back honestly.
 - Never commit your token file or `.env` — both are already in

@@ -8,6 +8,7 @@ from pydantic import BaseModel, EmailStr, Field, StringConstraints
 
 import auth
 import database
+import limits
 import media
 import storage
 from agent_config import CORE_RULES
@@ -445,3 +446,24 @@ def reset_user_password(user_id: int, user: dict = Depends(auth.require_owner)):
 def delete_user(user_id: int, user: dict = Depends(auth.require_owner)):
     target = _other_user(user_id, user)
     database.delete_user(target["id"])
+
+
+# ---------- chat limits & usage (owners only) ----------
+
+class LimitSettings(BaseModel):
+    burst_limit: int | None = None
+    burst_window_minutes: int | None = None
+    visitor_daily_limit: int | None = None
+    global_daily_limit: int | None = None
+    history_messages: int | None = None
+
+
+@router.get("/usage")
+def usage(user: dict = Depends(auth.require_owner)):
+    return limits.usage_summary()
+
+
+@router.put("/settings/limits")
+def update_limits(req: LimitSettings, user: dict = Depends(auth.require_owner)):
+    values = {k: v for k, v in req.model_dump().items() if v is not None}
+    return limits.update_settings(values, user["email"])

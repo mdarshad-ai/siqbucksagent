@@ -633,3 +633,73 @@
   border-radius: 8px;
   margin: 0.5rem 0 0.75rem;
 }
+
+/* ---------- settings & usage ---------- */
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.usage-stats {
+  display: flex;
+  gap: 2.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.usage-number {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-meter {
+  height: 10px;
+}
+
+.progress-bar-warn {
+  background: var(--warn);
+}
+
+.usage-week-title {
+  margin-top: 1.25rem !important;
+}
+
+.usage-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.usage-bar-track {
+  height: 90px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--bg-deep);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.usage-bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--accent);
+}
+
+.usage-day-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 860px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+}

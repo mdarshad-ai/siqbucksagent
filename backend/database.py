@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    and_,
     create_engine,
     delete,
     func,
@@ -30,6 +31,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.exc import IntegrityError
 
 import agent_config
 
@@ -128,6 +130,25 @@ users = Table(
     # Bumped on every password change/reset so older login tokens stop working.
     Column("token_version", Integer, nullable=False, default=0),
     Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+# Small key/value store for owner-editable settings (values are JSON).
+app_settings = Table(
+    "app_settings",
+    metadata,
+    Column("key", String(64), primary_key=True),
+    Column("value", Text, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("updated_by", String(255)),
+)
+
+# Daily usage counters for rate limiting, e.g. ("2026-09-26", "global").
+usage_counters = Table(
+    "usage_counters",
+    metadata,
+    Column("day", String(10), primary_key=True),
+    Column("key", String(120), primary_key=True),
+    Column("count", Integer, nullable=False, default=0),
 )
 
 # Fields the admin UI can set on an item, and the subset customers may see.
@@ -442,6 +463,87 @@ def delete_media(item_id: int, media_id: int):
     with get_engine().begin() as conn:
         conn.execute(delete(media).where(media.c.id == media_id))
     return row
+
+
+# ---------- settings ----------
+
+def get_settings_rows():
+    with get_engine().connect() as conn:
+        rows = conn.execute(select(app_settings)).fetchall()
+    return {r.key: json.loads(r.value) for r in rows}
+
+
+def set_settings(values: dict, user_email: str):
+    now = _now()
+    with get_engine().begin() as conn:
+        for key, value in values.items():
+            encoded = json.dumps(value)
+            result = conn.execute(
+                update(app_settings).where(app_settings.c.key == key)
+                .values(value=encoded, updated_at=now, updated_by=user_email)
+            )
+            if result.rowcount == 0:
+                conn.execute(
+                    insert(app_settings).values(
+                        key=key, value=encoded, updated_at=now, updated_by=user_email
+                    )
+                )
+
+
+# ---------- usage counters ----------
+
+def increment_counter(day: str, key: str, amount: int = 1) -> int:
+    """Add to a daily counter and return its new value."""
+    where = and_(usage_counters.c.day == day, usage_counters.c.key == key)
+    for _ in range(3):  # retry if two requests create the same row at once
+        try:
+            with get_engine().begin() as conn:
+                result = conn.execute(
+                    update(usage_counters).where(where)
+                    .values(count=usage_counters.c.count + amount)
+                )
+                if result.rowcount == 0:
+                    conn.execute(insert(usage_counters).values(day=day, key=key, count=amount))
+                return conn.execute(select(usage_counters.c.count).where(where)).scalar()
+        except IntegrityError:
+            continue
+    raise RuntimeError("Couldn't update usage counter")
+
+
+def get_counter(day: str, key: str) -> int:
+    with get_engine().connect() as conn:
+        value = conn.execute(
+            select(usage_counters.c.count).where(
+                usage_counters.c.day == day, usage_counters.c.key == key
+            )
+        ).scalar()
+    return value or 0
+
+
+def count_counters(day: str, prefix: str) -> int:
+    """How many counters exist for a day with a key prefix (e.g. visitors)."""
+    with get_engine().connect() as conn:
+        return conn.execute(
+            select(func.count()).select_from(usage_counters).where(
+                usage_counters.c.day == day, usage_counters.c.key.like(f"{prefix}%")
+            )
+        ).scalar()
+
+
+def counter_history(key: str, days: list[str]):
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            select(usage_counters.c.day, usage_counters.c.count).where(
+                usage_counters.c.key == key, usage_counters.c.day.in_(days)
+            )
+        ).fetchall()
+    found = dict(rows)
+    return [{"day": d, "count": found.get(d, 0)} for d in days]
+
+
+def prune_counters(before_day: str):
+    with get_engine().begin() as conn:
+        conn.execute(delete(usage_counters).where(usage_counters.c.day < before_day))
 
 
 # ---------- users ----------

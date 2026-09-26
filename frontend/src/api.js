@@ -15,15 +15,44 @@ export async function fetchInventory(agentId) {
   return res.json();
 }
 
+// An anonymous id for this browser, used only for fair-use chat limits.
+let sessionVisitorId = null;
+export function getVisitorId() {
+  try {
+    let id = localStorage.getItem("gem-visitor-id");
+    if (!id) {
+      id = crypto.randomUUID().replace(/-/g, "");
+      localStorage.setItem("gem-visitor-id", id);
+    }
+    return id;
+  } catch {
+    // Storage blocked: keep one id for this page load.
+    sessionVisitorId ??= Math.random().toString(36).slice(2).padEnd(12, "0");
+    return sessionVisitorId;
+  }
+}
+
+export class ChatError extends Error {
+  constructor(message, { code = null, retryAfter = null } = {}) {
+    super(message);
+    this.code = code;
+    this.retryAfter = retryAfter;
+  }
+}
+
 export async function sendChatMessage(agentId, message, history) {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Visitor-Id": getVisitorId() },
     body: JSON.stringify({ agent_id: agentId, message, history }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Chat request failed");
+    const detail = err.detail;
+    if (detail && typeof detail === "object" && detail.code) {
+      throw new ChatError(detail.message, { code: detail.code, retryAfter: detail.retry_after });
+    }
+    throw new ChatError(typeof detail === "string" ? detail : "Chat request failed");
   }
   return res.json();
 }

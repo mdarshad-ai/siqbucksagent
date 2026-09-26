@@ -3,6 +3,7 @@ import { api, getToken, setToken, setUnauthorizedHandler } from "./adminApi.js";
 import InventoryTab from "./InventoryTab.jsx";
 import AgentsTab from "./AgentsTab.jsx";
 import UsersTab from "./UsersTab.jsx";
+import SettingsTab from "./SettingsTab.jsx";
 import "./admin.css";
 
 function LoginForm({ onLoggedIn }) {
@@ -113,6 +114,7 @@ const TABS = [
   { id: "inventory", label: "Inventory", ownerOnly: false },
   { id: "agents", label: "Agents", ownerOnly: true },
   { id: "users", label: "Users", ownerOnly: true },
+  { id: "settings", label: "Settings", ownerOnly: true },
 ];
 
 export default function AdminApp() {
@@ -172,6 +174,7 @@ export default function AdminApp() {
         {active === "inventory" && <InventoryTab />}
         {active === "agents" && <AgentsTab />}
         {active === "users" && <UsersTab me={user} />}
+        {active === "settings" && <SettingsTab />}
       </>
     );
   }
