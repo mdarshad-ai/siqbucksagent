@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+frontend/dist
+frontend/.env
+backend/venv
+backend/.env
+backend/inventory.db
+backend/token.txt
+backend/*.token
+backend/static

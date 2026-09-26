@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Annotated, Literal
 
 from dotenv import load_dotenv
@@ -8,6 +9,7 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, StringConstraints
 
 import database
@@ -96,3 +98,11 @@ def chat(req: ChatRequest):
             detail="The agent couldn't reply right now. Please try again.",
         )
     return ChatResponse(reply=reply, history=updated_history)
+
+
+# In a single-service deploy (see Dockerfile), the built frontend is copied
+# here and served from the same origin as the API. Mounted last so the /api
+# routes above take precedence. Local dev (Vite on :5173) doesn't use this.
+STATIC_DIR = Path(os.environ.get("STATIC_DIR", Path(__file__).parent / "static"))
+if STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="frontend")
