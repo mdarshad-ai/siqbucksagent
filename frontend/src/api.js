@@ -1,4 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// In dev the API runs separately on :8000. In a production build with no
+// VITE_API_URL, the backend serves this app itself, so use the same origin.
+const API_URL =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:8000" : "");
 
 export async function fetchAgents() {
   const res = await fetch(`${API_URL}/api/agents`);

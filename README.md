@@ -112,7 +112,7 @@ Edit `SIQ_ITEMS` / `BUCKS_ITEMS` in `backend/database.py` and delete the
 existing `inventory.db` file (it's only seeded when the table is empty), or
 add a small admin script if you want to edit it without restarting.
 
-## 5. Deploy — Railway (recommended for a first deploy)
+## 5. Deploy — Railway (paid after a trial)
 
 Push this whole folder to a GitHub repo, then in Railway:
 
@@ -141,24 +141,30 @@ Push this whole folder to a GitHub repo, then in Railway:
 4. Deploy. Then go back to the backend service and set `FRONTEND_ORIGIN` to
    this frontend's public URL, and redeploy the backend so CORS allows it.
 
-## 6. Deploy — Render (alternative)
+## 6. Deploy — Render (free)
 
-Same shape, two separate services:
+`render.yaml` and the root `Dockerfile` deploy the whole app as **one free
+web service**: the Docker build compiles the React frontend and the FastAPI
+backend serves it alongside `/api`, so there's a single URL and no CORS or
+`VITE_API_URL` to wire up.
 
-1. **Backend**: New → Web Service → connect repo → root directory
-   `backend` → build command `pip install -r requirements.txt` → start
-   command `uvicorn main:app --host 0.0.0.0 --port $PORT`. Add
-   `OPENROUTER_API_KEY` (or `OPENROUTER_API_KEY_FILE`), `OPENROUTER_MODEL`,
-   and `FRONTEND_ORIGIN` under Environment.
-2. **Frontend**: New → Static Site → root directory `frontend` → build
-   command `npm install && npm run build` → publish directory `dist`. Add
-   `VITE_API_URL` under Environment (build-time), pointing at the backend's
-   `.onrender.com` URL.
-3. Update the backend's `FRONTEND_ORIGIN` to the frontend's `.onrender.com`
-   URL once you have it, and redeploy the backend.
+1. Sign up at https://render.com (no credit card needed) and connect GitHub.
+2. New → **Blueprint** → pick this repo. Render reads `render.yaml`.
+3. When prompted, paste your `OPENROUTER_API_KEY`, then click **Apply**.
+4. Wait for the first build (a few minutes). Your app is at the service's
+   `https://….onrender.com` URL, shown on its dashboard page.
 
-Render's free tier backend will spin down when idle and take ~30-60s to
-wake on the first request — expected on a free plan, not a bug.
+Every push to `main` redeploys automatically. To change the model, edit
+`OPENROUTER_MODEL` in `render.yaml` or on the service's Environment page.
+
+Things to know about the free plan:
+
+- The service sleeps after 15 minutes without traffic; the next visit takes
+  about a minute to wake it up. That's expected, not a bug.
+- The disk isn't persistent, but that doesn't matter here: `inventory.db` is
+  re-created and re-seeded on every start.
+- Anyone with the URL can chat, and each chat is billed to your OpenRouter
+  account. Set a credit limit on the key in OpenRouter to cap spend.
 
 ## 7. Things to harden before showing this to anyone else
 
