@@ -1,17 +1,35 @@
-# The Gem Exchange — Two Sales Agents
+# Loupe Gem — Your two gem partners
 
-A small full-stack demo: two animated "dealer" agents — Siq at *Pacific
-Gems* and Bucks at *Bucks' Exchange* — each backed by an LLM (via
-OpenRouter) and its own SQLite inventory. Click a counter to chat; the
-agent looks up real stock and prices via tool calls before answering.
+*Your two gem partners. Real stones. Just ask.*
+
+An agent-led gem shop. Two animated partners — Siq at *Pacific Gems* and
+Bucks at *Bucks' Exchange* — are each backed by an LLM (via OpenRouter)
+and their own inventory. Customers shop by conversation: the partners look
+up real stock and prices with tool calls, show the actual stone with photos
+and video, and customers can ask the shop to reserve it.
 
 ```
-sales-agents-app/
-├── backend/     FastAPI + SQLite + OpenRouter tool-calling
-└── frontend/    React (Vite) + animated SVG characters
+backend/     FastAPI + SQLAlchemy (SQLite locally, Supabase Postgres in
+             production) + OpenRouter tool-calling
+frontend/    React (Vite): the Loupe Gem site, the chat, and /admin
 ```
 
-## The two agents
+## The site
+
+- **Homepage**: a hero with one "just ask" box (the question is routed to
+  the best-suited partner by a cheap keyword/inventory match, no AI call),
+  *Meet your AI partners* with sample questions, *On the counter tonight*
+  (stones the shop features from /admin), how it works, and a closing ask
+  box. A floating *Talk to an AI partner* button follows you down the page.
+- **The counter**: chatting opens a full-screen counter — the partner stands
+  in a lit arch on the left (talking while they reply), the conversation on
+  the right; on phones it becomes a compact header above the chat. Replies
+  stream in as they're written, with stone cards, 2–3 tappable follow-up
+  questions, and — when the other partner is a better fit — a one-tap
+  handoff that carries the question over. Conversations are remembered in
+  the visitor's browser ("Welcome back", with *Start fresh*).
+
+## The two partners
 
 - **Siq — Pacific Gems**: sells a small, curated line of certified fine
   gemstones (sapphires, emeralds, rubies, etc.), all sourced through one
@@ -100,14 +118,18 @@ pytest
   `users` (admin logins). SQLite locally, Postgres (Supabase) in production.
 - `backend/llm_service.py` — the OpenRouter call, using the OpenAI-compatible
   SDK pointed at `https://openrouter.ai/api/v1`. The system prompt is the
-  agent's persona + selling style + core rules. Each agent has three tools,
-  `search_inventory`, `get_item_details` and `show_item`, which only ever
+  agent's persona + selling style + core rules. Each agent's own-stock tools are
+  `search_inventory`, `get_item_details` and `show_item` (which only ever
   touch *that agent's own* stones; `get_item_details` also returns the
   stone's story and sales guidance, and `show_item` puts a stone card in
-  the chat.
+  the chat), plus `suggest_replies` (tappable follow-ups) and
+  `refer_to_partner` (hand the customer to the other partner).
 - `backend/main.py` — public endpoints: `GET /api/agents`,
   `GET /api/agents/{id}/inventory` (never includes story or guidance),
-  `POST /api/chat`.
+  `POST /api/chat` (whole reply) and `POST /api/chat/stream` (the same as
+  server-sent events: `delta`, `card`, `suggestions`, `handoff`, then
+  `done` or `error`), `POST /api/route`, `GET /api/featured` and
+  `POST /api/reservations`.
 - `backend/admin_api.py` + `backend/auth.py` — the `/api/admin` endpoints
   and logins behind the admin page.
 - `backend/storage.py` + `backend/media.py` — stone photos/videos: Supabase
@@ -124,7 +146,9 @@ pytest
 Open `/admin` (locally: http://localhost:5173/admin). The first owner account
 is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
 
-- **Inventory** (owners and staff): add, edit and delete each dealer's
+- **Inventory** (owners and staff): tick *Feature on the homepage* to put
+  a stone *On the counter tonight* (up to 4 available stones are shown).
+  Add, edit and delete each dealer's
   stones — price, stock, status (available / reserved / sold), carat, cut,
   colour, clarity, origin, treatment and certification — plus the stone's
   memory:

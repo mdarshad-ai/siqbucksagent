@@ -40,23 +40,6 @@ export class ChatError extends Error {
   }
 }
 
-export async function sendChatMessage(agentId, message, history) {
-  const res = await fetch(`${API_URL}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Visitor-Id": getVisitorId() },
-    body: JSON.stringify({ agent_id: agentId, message, history }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const detail = err.detail;
-    if (detail && typeof detail === "object" && detail.code) {
-      throw new ChatError(detail.message, { code: detail.code, retryAfter: detail.retry_after });
-    }
-    throw new ChatError(typeof detail === "string" ? detail : "Chat request failed");
-  }
-  return res.json();
-}
-
 // Media URLs from local-dev storage are relative to the API; Supabase URLs
 // are absolute already.
 export function assetUrl(url) {
@@ -94,5 +77,79 @@ export function rememberRequested(stoneKey, reference) {
     localStorage.setItem(REQUESTED_KEY, JSON.stringify({ ...getRequested(), [stoneKey]: reference }));
   } catch {
     // Not critical - the button just won't remember after a reload.
+  }
+}
+
+async function chatErrorFrom(res) {
+  const err = await res.json().catch(() => ({}));
+  const detail = err.detail;
+  if (detail && typeof detail === "object" && detail.code) {
+    return new ChatError(detail.message, { code: detail.code, retryAfter: detail.retry_after });
+  }
+  return new ChatError(typeof detail === "string" ? detail : "Chat request failed");
+}
+
+// Stream a reply as server-sent events. handlers: onDelta(text), onCard(card),
+// onSuggestions(options), onHandoff(handoff). Resolves with the final "done"
+// payload ({reply, cards, suggestions, handoff, history}).
+export async function streamChat(agentId, message, history, handlers = {}) {
+  const res = await fetch(`${API_URL}/api/chat/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Visitor-Id": getVisitorId() },
+    body: JSON.stringify({ agent_id: agentId, message, history }),
+  });
+  if (!res.ok) throw await chatErrorFrom(res);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let done = null;
+  for (;;) {
+    const { value, done: finished } = await reader.read();
+    if (finished) break;
+    buffer += decoder.decode(value, { stream: true });
+    let split;
+    while ((split = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, split);
+      buffer = buffer.slice(split + 2);
+      let event = "message";
+      let data = "";
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event: ")) event = line.slice(7);
+        else if (line.startsWith("data: ")) data += line.slice(6);
+      }
+      const payload = data ? JSON.parse(data) : {};
+      if (event === "delta") handlers.onDelta?.(payload.text);
+      else if (event === "card") handlers.onCard?.(payload.card);
+      else if (event === "suggestions") handlers.onSuggestions?.(payload.options);
+      else if (event === "handoff") handlers.onHandoff?.(payload);
+      else if (event === "error") throw new ChatError(payload.message);
+      else if (event === "done") done = payload;
+    }
+  }
+  if (!done) throw new ChatError("The connection dropped. Please try again.");
+  return done;
+}
+
+export async function routeQuestion(message) {
+  try {
+    const res = await fetch(`${API_URL}/api/route`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    if (res.ok) return (await res.json()).agent_id;
+  } catch {
+    // Fall through to the default partner.
+  }
+  return null;
+}
+
+export async function fetchFeatured() {
+  try {
+    const res = await fetch(`${API_URL}/api/featured`);
+    return res.ok ? res.json() : [];
+  } catch {
+    return [];
   }
 }

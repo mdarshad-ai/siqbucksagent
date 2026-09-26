@@ -18,6 +18,7 @@ const EMPTY_STONE = {
   description: "",
   story: "",
   sales_guidance: "",
+  featured: false,
 };
 
 const DETAIL_FIELDS = [
@@ -56,7 +57,8 @@ function StoneForm({ agentId, item, onSaved, onCancel, onDeleted, onMediaCount }
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set = (key) => (e) =>
+    setForm((f) => ({ ...f, [key]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
 
   async function save(e) {
     e.preventDefault();
@@ -122,6 +124,13 @@ function StoneForm({ agentId, item, onSaved, onCancel, onDeleted, onMediaCount }
                 <option value="reserved">Reserved (on hold)</option>
                 <option value="sold">Sold</option>
               </select>
+            </label>
+            <label className="span-2 check-row">
+              <input type="checkbox" checked={Boolean(form.featured)} onChange={set("featured")} />
+              <span>
+                Feature on the homepage under <em>On the counter tonight</em>{" "}
+                <span className="admin-muted">(up to 4 are shown, available stones only)</span>
+              </span>
             </label>
           </div>
         </fieldset>
@@ -321,7 +330,10 @@ export default function InventoryTab() {
             {visible.map((i) => (
               <tr key={i.id} onClick={() => setEditing(i)} className="clickable">
                 <td>
-                  <div className="cell-strong">{i.name}</div>
+                  <div className="cell-strong">
+                    {i.featured && <span className="featured-star" title="On the counter tonight">★ </span>}
+                    {i.name}
+                  </div>
                   <div className="admin-muted">{i.category}</div>
                 </td>
                 <td className="admin-muted">

@@ -197,7 +197,7 @@ export default function AdminApp() {
     <div className="admin-root">
       <header className="admin-header">
         <div>
-          <h1>The Gem Exchange</h1>
+          <h1>Loupe Gem</h1>
           <span className="admin-muted">Admin</span>
         </div>
         <div className="admin-row">

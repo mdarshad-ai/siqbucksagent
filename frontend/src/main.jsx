@@ -2,7 +2,11 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import AdminApp from "./admin/AdminApp.jsx";
-import "./App.css";
+import "./styles/base.css";
+import "./styles/character.css";
+import "./styles/cards.css";
+import "./styles/site.css";
+import "./styles/counter.css";
 
 const isAdmin = window.location.pathname.replace(/\/+$/, "").startsWith("/admin");
 

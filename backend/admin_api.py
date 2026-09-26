@@ -148,6 +148,7 @@ class ItemFields(BaseModel):
     description: Text = Field(default="", max_length=2000)
     story: Text = Field(default="", max_length=5000)
     sales_guidance: Text = Field(default="", max_length=5000)
+    featured: bool = False
 
 
 @router.get("/agents/{agent_id}/items")

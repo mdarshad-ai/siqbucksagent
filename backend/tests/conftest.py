@@ -94,6 +94,29 @@ def _response(content=None, tool_calls=None):
     return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
 
+def _as_stream(resp):
+    """Turn a whole response into the chunks a streaming API sends: the text
+    in two pieces, then each tool call split across two chunks."""
+    msg = resp.choices[0].message
+
+    def chunk(content=None, tool_calls=None):
+        delta = SimpleNamespace(content=content, tool_calls=tool_calls)
+        return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
+
+    if msg.content:
+        half = len(msg.content) // 2
+        yield chunk(content=msg.content[:half])
+        yield chunk(content=msg.content[half:])
+    for index, tc in enumerate(msg.tool_calls or []):
+        args = tc.function.arguments or ""
+        cut = len(args) // 2
+        yield chunk(tool_calls=[SimpleNamespace(
+            index=index, id=tc.id, function=SimpleNamespace(name=tc.function.name, arguments=args[:cut]))])
+        yield chunk(tool_calls=[SimpleNamespace(
+            index=index, id=None, function=SimpleNamespace(name=None, arguments=args[cut:]))])
+    yield SimpleNamespace(choices=[])  # e.g. a trailing usage chunk
+
+
 class FakeLLM:
     """Stands in for the OpenAI client: returns queued responses in order and
     records every request it was sent."""
@@ -108,6 +131,8 @@ class FakeLLM:
         next_item = self.responses.pop(0)
         if isinstance(next_item, Exception):
             raise next_item
+        if kwargs.get("stream"):
+            return _as_stream(next_item)
         return next_item
 
 

@@ -27,8 +27,10 @@ from sqlalchemy import (
     delete,
     func,
     insert,
+    inspect,
     or_,
     select,
+    text,
     update,
 )
 from sqlalchemy.exc import IntegrityError
@@ -92,6 +94,8 @@ items = Table(
     # sales_guidance: private coaching, never sent to the public API.
     Column("story", Text, nullable=False, default=""),
     Column("sales_guidance", Text, nullable=False, default=""),
+    # Shown on the homepage under "On the counter tonight".
+    Column("featured", Boolean, nullable=False, default=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
 )
@@ -184,7 +188,7 @@ usage_counters = Table(
 ITEM_EDITABLE_FIELDS = (
     "name", "category", "carat", "cut", "color", "clarity", "origin",
     "treatment", "certification", "price", "quantity", "status",
-    "description", "story", "sales_guidance",
+    "description", "story", "sales_guidance", "featured",
 )
 ITEM_PUBLIC_FIELDS = (
     "id", "name", "category", "carat", "cut", "color", "clarity", "origin",
@@ -235,11 +239,29 @@ def reset_engine():
     _engine = None
 
 
+# Columns added after a table first shipped. create_all() only creates
+# missing tables, so these are added to existing databases on startup.
+ADDED_COLUMNS = [
+    ("items", "featured", {"sqlite": "BOOLEAN NOT NULL DEFAULT 0", "default": "BOOLEAN NOT NULL DEFAULT false"}),
+]
+
+
+def _add_missing_columns(engine):
+    inspector = inspect(engine)
+    for table, column, ddl in ADDED_COLUMNS:
+        existing = {c["name"] for c in inspector.get_columns(table)}
+        if column not in existing:
+            spec = ddl.get(engine.dialect.name, ddl["default"])
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {spec}"))
+
+
 def init_db():
     """Create tables and seed agents/items the first time only. Never
     overwrites data that's already there."""
     engine = get_engine()
     metadata.create_all(engine)
+    _add_missing_columns(engine)
     with engine.begin() as conn:
         if conn.execute(select(func.count()).select_from(agents)).scalar() == 0:
             now = _now()
@@ -369,6 +391,17 @@ def list_items(agent_id: str, with_media_counts: bool = False):
             for item in result:
                 item["media_count"] = counts.get(item["id"], 0)
     return result
+
+
+def list_featured_items(limit: int = 4):
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            select(items)
+            .where(items.c.featured.is_(True), items.c.status == "available", items.c.quantity > 0)
+            .order_by(items.c.updated_at.desc())
+            .limit(limit)
+        ).fetchall()
+    return [dict(r._mapping) for r in rows]
 
 
 def get_item(agent_id: str, item_id):
