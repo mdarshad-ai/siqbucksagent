@@ -100,3 +100,24 @@ def test_missing_api_key_is_500(client, fake_llm, monkeypatch):
 
     assert res.status_code == 500
     assert "OPENROUTER_API_KEY" in res.json()["detail"]
+
+
+def test_text_sent_alongside_a_tool_call_is_kept(client, fake_llm):
+    # The model talks while calling a tool, then ends with an empty message.
+    first = response(content="Let me check the ruby for you.",
+                     tool_calls=[tool_call("c1", "search_inventory", '{"query": "ruby"}')])
+    fake_llm(first, response(content=""))
+    res = client.post("/api/chat", json={"agent_id": "siq", "message": "Ruby?"})
+    assert res.json()["reply"] == "Let me check the ruby for you."
+
+
+def test_empty_reply_after_showing_a_card_gets_a_fallback(client, fake_llm):
+    import database
+
+    ruby = next(i for i in database.list_items("siq") if "Ruby" in i["name"])
+    fake_llm(
+        response(tool_calls=[tool_call("c1", "show_item", f'{{"item_id": {ruby["id"]}}}')]),
+        response(content=None),
+    )
+    res = client.post("/api/chat", json={"agent_id": "siq", "message": "Ruby?"}).json()
+    assert res["reply"] == "Have a look at this one below." and len(res["cards"]) == 1

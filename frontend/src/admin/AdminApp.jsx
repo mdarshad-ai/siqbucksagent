@@ -3,6 +3,8 @@ import { api, getToken, setToken, setUnauthorizedHandler } from "./adminApi.js";
 import InventoryTab from "./InventoryTab.jsx";
 import AgentsTab from "./AgentsTab.jsx";
 import UsersTab from "./UsersTab.jsx";
+import SettingsTab from "./SettingsTab.jsx";
+import RequestsTab from "./RequestsTab.jsx";
 import "./admin.css";
 
 function LoginForm({ onLoggedIn }) {
@@ -111,8 +113,10 @@ export function ChangePasswordForm({ forced, onDone, onCancel }) {
 
 const TABS = [
   { id: "inventory", label: "Inventory", ownerOnly: false },
+  { id: "requests", label: "Requests", ownerOnly: false },
   { id: "agents", label: "Agents", ownerOnly: true },
   { id: "users", label: "Users", ownerOnly: true },
+  { id: "settings", label: "Settings", ownerOnly: true },
 ];
 
 export default function AdminApp() {
@@ -120,12 +124,22 @@ export default function AdminApp() {
   const [checking, setChecking] = useState(Boolean(getToken()));
   const [tab, setTab] = useState("inventory");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
     setChangingPassword(false);
   }, []);
+
+  // Keep the Requests badge fresh while the admin page is open.
+  useEffect(() => {
+    if (!user || user.must_change_password) return;
+    const poll = () => api("/reservations/summary").then((s) => setPendingCount(s.pending)).catch(() => {});
+    poll();
+    const timer = setInterval(poll, 60000);
+    return () => clearInterval(timer);
+  }, [user]);
 
   useEffect(() => {
     setUnauthorizedHandler(logout);
@@ -166,12 +180,15 @@ export default function AdminApp() {
               onClick={() => setTab(t.id)}
             >
               {t.label}
+              {t.id === "requests" && pendingCount > 0 && <span className="tab-badge">{pendingCount}</span>}
             </button>
           ))}
         </nav>
         {active === "inventory" && <InventoryTab />}
+        {active === "requests" && <RequestsTab onPendingCount={setPendingCount} />}
         {active === "agents" && <AgentsTab />}
         {active === "users" && <UsersTab me={user} />}
+        {active === "settings" && <SettingsTab />}
       </>
     );
   }

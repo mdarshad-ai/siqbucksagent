@@ -81,7 +81,7 @@ def admin_media(row: dict) -> dict:
 
 
 CARD_FIELDS = (
-    "id", "name", "category", "carat", "cut", "color", "origin", "treatment",
+    "id", "agent_id", "name", "category", "carat", "cut", "color", "origin", "treatment",
     "certification", "price", "quantity", "status",
 )
 

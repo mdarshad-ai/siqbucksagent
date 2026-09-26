@@ -18,7 +18,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 import jwt
@@ -107,6 +107,12 @@ class SupabaseStorage:
     name = "supabase"
 
     def __init__(self, base_url: str, key: str, bucket: str):
+        # Only the project origin matters. People often paste the Data API
+        # URL (https://<ref>.supabase.co/rest/v1), which would send storage
+        # calls to the database API instead.
+        parsed = urlparse(base_url.strip())
+        if parsed.scheme and parsed.netloc:
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
         self.base_url = base_url.rstrip("/")
         self.api = f"{self.base_url}/storage/v1"
         self.bucket = bucket

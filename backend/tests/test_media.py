@@ -249,3 +249,21 @@ def test_show_item_rules(client, staff):
         llm_service._run_tool("siq", "show_item", {"item_id": ids[3]}, shown)
     )["error"]
     assert [c["id"] for c in shown] == ids[:3]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://abcdefgh.supabase.co",
+        "https://abcdefgh.supabase.co/",
+        "https://abcdefgh.supabase.co/rest/v1",
+        "https://abcdefgh.supabase.co/rest/v1/",
+        " https://abcdefgh.supabase.co/storage/v1 ",
+    ],
+)
+def test_supabase_url_is_reduced_to_project_origin(url):
+    store = storage.SupabaseStorage(url, "sb_secret_x", "stone-media")
+    assert store.api == "https://abcdefgh.supabase.co/storage/v1"
+    assert store.public_url("items/1/a.jpg") == (
+        "https://abcdefgh.supabase.co/storage/v1/object/public/stone-media/items/1/a.jpg"
+    )

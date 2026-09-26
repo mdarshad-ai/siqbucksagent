@@ -143,11 +143,28 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
   photos (tap for full screen), videos that play in place, price, stock and
   key details. Sold-out stones never get a card, and there are at most three
   cards per reply.
+- **Reserve this stone**: every stone card in the chat has a *Reserve this
+  stone* button (dealers highlight it when a customer is keen). Customers
+  send their name, email, optional phone and note, and can choose to
+  include their chat. A request never changes stock by itself.
+- **Requests** (owners and staff): waiting requests show with a count badge.
+  *Confirm hold* marks a one-off stone as reserved (or sets one unit aside
+  when there are several) for a number of days, so the dealers tell other
+  customers it's on hold. Holds can be extended, released, or marked sold,
+  and expire automatically. Closed requests, with the customer's details,
+  are deleted after 90 days. Requests are limited to 3 per visitor per day,
+  with a hidden spam trap.
 - **Agents** (owners only): edit each dealer's name, stall, tagline,
   persona and selling style. Test a draft in the preview chat (real
   inventory, customers don't see it), then **Publish**. Every publish is
   kept in the history and can be loaded back. The core rules are shown
   read-only and always apply.
+- **Settings** (owners only): chat usage today and over the last 7 days,
+  and the chat limits that protect your OpenRouter bill: a short-burst
+  limit and a daily limit per visitor (shared IPs get 3x), a daily cap for
+  the whole shop, and how many past messages are sent to the AI with each
+  question. Customers who hit a limit get a friendly message in the
+  dealer's voice. Counts reset at midnight UTC.
 - **Users** (owners only): add owners or staff. A new user gets a one-time
   temporary password (shown once) and must choose their own at first login.
   Owners can change roles, reset passwords and remove users.
@@ -198,8 +215,9 @@ so inventory, personas and users survive restarts and redeploys.
    database password.
 
 3. For photos and videos, copy two more values:
-   - **Project URL**: Project Settings → Data API (e.g.
-     `https://abcdefgh.supabase.co`)
+   - **Project URL**: Project Settings → Data API, just the
+     `https://abcdefgh.supabase.co` part (anything after it, like
+     `/rest/v1`, is ignored)
    - **Secret key**: Project Settings → API Keys → create or copy a
      **secret** key (`sb_secret_…`), or use the legacy `service_role` key.
      It has full access, so it only ever goes into Render, never the
@@ -241,8 +259,6 @@ plans:
 
 ## 7. Things to harden before showing this to anyone else
 
-- Rate-limit `/api/chat` (a public chat box wired to a paid API is an easy
-  way to run up a bill).
 - Move conversation history server-side (session cookie + table) instead of
   trusting the client to send it back honestly.
 - Never commit your token file or `.env` — both are already in

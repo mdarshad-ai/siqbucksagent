@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 from fastapi import HTTPException
 from pydantic import BaseModel, StringConstraints
 
+import limits
 from llm_service import _get_api_key, chat_with_agent
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,10 @@ def run_chat(agent_id: str, message: str, history: list[ChatMessage], agent_over
             ),
         )
 
-    history_dicts = [h.model_dump(exclude={"cards"}) for h in history]
+    # Long chats resend everything on each turn, so only the most recent
+    # messages go to the model (the client still keeps the full history).
+    keep = limits.get_settings()["history_messages"]
+    history_dicts = [h.model_dump(exclude={"cards"}) for h in history[-keep:]]
     try:
         reply, _, cards = chat_with_agent(
             agent_id, message, history_dicts, agent_override=agent_override

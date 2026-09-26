@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import RichText from "../components/RichText.jsx";
 import { api } from "./adminApi.js";
 
 const FIELDS = ["display_name", "stall_name", "tagline", "persona", "selling_rules"];
@@ -61,7 +62,7 @@ function PreviewChat({ agentId, draft, name }) {
         {history.length === 0 && <div className="admin-muted">Ask {name || "the agent"} something to test the draft.</div>}
         {history.map((turn, i) => (
           <div key={i} className={`preview-bubble preview-${turn.role}`}>
-            {turn.content}
+            {turn.role === "assistant" ? <RichText text={turn.content} /> : turn.content}
           </div>
         ))}
         {busy && <div className="preview-bubble preview-assistant admin-muted">Thinking...</div>}

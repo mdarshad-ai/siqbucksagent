@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { getRequested, rememberRequested } from "../api.js";
 import { Lightbox, MediaThumb, MediaView } from "./MediaViewer.jsx";
+import ReserveModal from "./ReserveModal.jsx";
 
 function formatPrice(n) {
   return `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -12,10 +14,14 @@ function stockLabel(card) {
 }
 
 // Shown under a dealer's reply when they recommend a stone.
-export default function StoneCard({ card }) {
+export default function StoneCard({ card, getTranscript = () => [] }) {
   const media = card.media || [];
   const [selected, setSelected] = useState(0);
   const [lightbox, setLightbox] = useState(null);
+  const [reserving, setReserving] = useState(false);
+  const stoneKey = `${card.agent_id}:${card.id}`;
+  const [requested, setRequested] = useState(() => getRequested()[stoneKey] || null);
+  const available = card.status === "available" && card.quantity > 0;
   const current = media[selected];
 
   const details = [
@@ -60,7 +66,30 @@ export default function StoneCard({ card }) {
           {formatPrice(card.price)} <span className="stone-card-stock">· {stockLabel(card)}</span>
         </div>
         {details.length > 0 && <div className="stone-card-details">{details.join(" · ")}</div>}
+        {requested ? (
+          <div className="stone-card-requested">✓ Reservation requested · {requested}</div>
+        ) : (
+          <button
+            className={`stone-card-reserve ${card.suggest_reserve ? "stone-card-reserve-suggested" : ""}`}
+            onClick={() => setReserving(true)}
+            disabled={!available}
+          >
+            {available ? "Reserve this stone" : card.status === "reserved" ? "On hold for another customer" : "Sold out"}
+          </button>
+        )}
       </div>
+
+      {reserving && (
+        <ReserveModal
+          card={card}
+          getTranscript={getTranscript}
+          onClose={() => setReserving(false)}
+          onRequested={(ref) => {
+            rememberRequested(stoneKey, ref);
+            setRequested(ref);
+          }}
+        />
+      )}
 
       {lightbox != null && (
         <Lightbox

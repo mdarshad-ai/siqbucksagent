@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    and_,
     create_engine,
     delete,
     func,
@@ -30,6 +31,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.exc import IntegrityError
 
 import agent_config
 
@@ -128,6 +130,54 @@ users = Table(
     # Bumped on every password change/reset so older login tokens stop working.
     Column("token_version", Integer, nullable=False, default=0),
     Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+RESERVATION_STATUSES = ("pending", "confirmed", "declined", "cancelled", "completed", "expired")
+
+# "Reserve this stone" requests. The stone's name and price are copied in so
+# the request still makes sense if the stone is later edited or deleted.
+reservations = Table(
+    "reservations",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("item_id", Integer, nullable=False, index=True),
+    Column("agent_id", String(32), nullable=False),
+    Column("item_name", String(200), nullable=False),
+    Column("item_price", Float, nullable=False),
+    Column("customer_name", String(120), nullable=False),
+    Column("email", String(255), nullable=False),
+    Column("phone", String(40), nullable=False, default=""),
+    Column("note", Text, nullable=False, default=""),
+    Column("transcript", Text),  # JSON list of {role, content}, if shared
+    Column("status", String(16), nullable=False, default="pending", index=True),
+    # How a confirmed hold was applied, so it can be undone exactly:
+    # "status" (item marked reserved) or "quantity" (one unit set aside).
+    Column("hold_kind", String(16)),
+    Column("hold_until", DateTime(timezone=True)),
+    Column("admin_note", Text, nullable=False, default=""),
+    Column("visitor_id", String(64)),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("handled_by", String(255)),
+)
+
+# Small key/value store for owner-editable settings (values are JSON).
+app_settings = Table(
+    "app_settings",
+    metadata,
+    Column("key", String(64), primary_key=True),
+    Column("value", Text, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("updated_by", String(255)),
+)
+
+# Daily usage counters for rate limiting, e.g. ("2026-09-26", "global").
+usage_counters = Table(
+    "usage_counters",
+    metadata,
+    Column("day", String(10), primary_key=True),
+    Column("key", String(120), primary_key=True),
+    Column("count", Integer, nullable=False, default=0),
 )
 
 # Fields the admin UI can set on an item, and the subset customers may see.
@@ -442,6 +492,173 @@ def delete_media(item_id: int, media_id: int):
     with get_engine().begin() as conn:
         conn.execute(delete(media).where(media.c.id == media_id))
     return row
+
+
+# ---------- reservations ----------
+
+def _as_utc(value):
+    # SQLite hands back naive datetimes; everything we store is UTC.
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _reservation_row(row):
+    r = dict(row._mapping)
+    for key in ("hold_until", "created_at", "updated_at"):
+        r[key] = _as_utc(r[key])
+    r["transcript"] = json.loads(r["transcript"]) if r["transcript"] else None
+    return r
+
+
+def create_reservation(fields: dict):
+    now = _now()
+    values = dict(fields)
+    if values.get("transcript") is not None:
+        values["transcript"] = json.dumps(values["transcript"])
+    with get_engine().begin() as conn:
+        result = conn.execute(
+            insert(reservations).values(status="pending", created_at=now, updated_at=now, **values)
+        )
+        rid = result.inserted_primary_key[0]
+    return get_reservation(rid)
+
+
+def get_reservation(reservation_id: int):
+    with get_engine().connect() as conn:
+        row = conn.execute(select(reservations).where(reservations.c.id == reservation_id)).first()
+    return _reservation_row(row) if row else None
+
+
+def list_reservations(statuses=None, limit: int = 200):
+    stmt = select(reservations).order_by(reservations.c.created_at.desc()).limit(limit)
+    if statuses:
+        stmt = stmt.where(reservations.c.status.in_(statuses))
+    with get_engine().connect() as conn:
+        return [_reservation_row(r) for r in conn.execute(stmt).fetchall()]
+
+
+def count_reservations(status: str) -> int:
+    with get_engine().connect() as conn:
+        return conn.execute(
+            select(func.count()).select_from(reservations).where(reservations.c.status == status)
+        ).scalar()
+
+
+def update_reservation(reservation_id: int, fields: dict, conn=None):
+    stmt = (
+        update(reservations).where(reservations.c.id == reservation_id)
+        .values(updated_at=_now(), **fields)
+    )
+    if conn is not None:
+        conn.execute(stmt)
+        return None
+    with get_engine().begin() as c:
+        c.execute(stmt)
+    return get_reservation(reservation_id)
+
+
+def due_holds(now):
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            select(reservations).where(
+                reservations.c.status == "confirmed", reservations.c.hold_until < now
+            )
+        ).fetchall()
+    return [_reservation_row(r) for r in rows]
+
+
+def purge_closed_reservations(before):
+    """Delete closed requests (and the customer details in them) older than
+    the retention window."""
+    with get_engine().begin() as conn:
+        conn.execute(
+            delete(reservations).where(
+                reservations.c.status.in_(("declined", "cancelled", "completed", "expired")),
+                reservations.c.updated_at < before,
+            )
+        )
+
+
+# ---------- settings ----------
+
+def get_settings_rows():
+    with get_engine().connect() as conn:
+        rows = conn.execute(select(app_settings)).fetchall()
+    return {r.key: json.loads(r.value) for r in rows}
+
+
+def set_settings(values: dict, user_email: str):
+    now = _now()
+    with get_engine().begin() as conn:
+        for key, value in values.items():
+            encoded = json.dumps(value)
+            result = conn.execute(
+                update(app_settings).where(app_settings.c.key == key)
+                .values(value=encoded, updated_at=now, updated_by=user_email)
+            )
+            if result.rowcount == 0:
+                conn.execute(
+                    insert(app_settings).values(
+                        key=key, value=encoded, updated_at=now, updated_by=user_email
+                    )
+                )
+
+
+# ---------- usage counters ----------
+
+def increment_counter(day: str, key: str, amount: int = 1) -> int:
+    """Add to a daily counter and return its new value."""
+    where = and_(usage_counters.c.day == day, usage_counters.c.key == key)
+    for _ in range(3):  # retry if two requests create the same row at once
+        try:
+            with get_engine().begin() as conn:
+                result = conn.execute(
+                    update(usage_counters).where(where)
+                    .values(count=usage_counters.c.count + amount)
+                )
+                if result.rowcount == 0:
+                    conn.execute(insert(usage_counters).values(day=day, key=key, count=amount))
+                return conn.execute(select(usage_counters.c.count).where(where)).scalar()
+        except IntegrityError:
+            continue
+    raise RuntimeError("Couldn't update usage counter")
+
+
+def get_counter(day: str, key: str) -> int:
+    with get_engine().connect() as conn:
+        value = conn.execute(
+            select(usage_counters.c.count).where(
+                usage_counters.c.day == day, usage_counters.c.key == key
+            )
+        ).scalar()
+    return value or 0
+
+
+def count_counters(day: str, prefix: str) -> int:
+    """How many counters exist for a day with a key prefix (e.g. visitors)."""
+    with get_engine().connect() as conn:
+        return conn.execute(
+            select(func.count()).select_from(usage_counters).where(
+                usage_counters.c.day == day, usage_counters.c.key.like(f"{prefix}%")
+            )
+        ).scalar()
+
+
+def counter_history(key: str, days: list[str]):
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            select(usage_counters.c.day, usage_counters.c.count).where(
+                usage_counters.c.key == key, usage_counters.c.day.in_(days)
+            )
+        ).fetchall()
+    found = dict(rows)
+    return [{"day": d, "count": found.get(d, 0)} for d in days]
+
+
+def prune_counters(before_day: str):
+    with get_engine().begin() as conn:
+        conn.execute(delete(usage_counters).where(usage_counters.c.day < before_day))
 
 
 # ---------- users ----------

@@ -1,20 +1,23 @@
 import logging
 import os
 from pathlib import Path
+from typing import Annotated, Literal
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import admin_api
 import auth
 import database
+import limits
+import reservations
 import storage
 from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat
 
@@ -34,6 +37,7 @@ if os.environ.get("RENDER") and not os.environ.get("SUPABASE_URL"):
     )
 database.init_db()
 auth.bootstrap_owner()
+limits.prune_old_counters()
 try:
     storage.get_storage().ensure_ready()
 except storage.StorageError:
@@ -82,10 +86,58 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, request: Request):
     if not database.get_agent(req.agent_id):
         raise HTTPException(status_code=404, detail="Unknown agent")
+    limits.check_chat_allowed(request)
+    reservations.sweep()  # expire old holds so the dealer sees current stock
     return run_chat(req.agent_id, req.message, req.history)
+
+
+Text = Annotated[str, StringConstraints(strip_whitespace=True)]
+
+
+class TranscriptMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=4000)
+
+
+class ReservationRequest(BaseModel):
+    agent_id: str
+    item_id: int
+    name: NonEmptyStr = Field(max_length=120)
+    email: EmailStr
+    phone: Text = Field(default="", max_length=40)
+    note: Text = Field(default="", max_length=1000)
+    consent: Literal[True]
+    share_chat: bool = False
+    transcript: list[TranscriptMessage] = Field(default=[], max_length=60)
+    website: str = ""  # honeypot: people never see this field; bots fill it in
+
+
+@app.post("/api/reservations", status_code=201)
+def create_reservation(req: ReservationRequest, request: Request):
+    if req.website:
+        # Looks like a bot. Pretend it worked, store nothing.
+        return {"reference": "LG-00000"}
+    if not database.get_agent(req.agent_id):
+        raise HTTPException(status_code=404, detail="Unknown agent")
+    visitor = limits.visitor_id(request)
+    reservations.check_request_allowed(visitor, limits.client_ip(request))
+    transcript = [m.model_dump() for m in req.transcript[-40:]] if req.share_chat else None
+    created = reservations.create_request(
+        req.agent_id,
+        req.item_id,
+        {
+            "customer_name": req.name,
+            "email": str(req.email),
+            "phone": req.phone,
+            "note": req.note,
+        },
+        transcript,
+        visitor,
+    )
+    return {"reference": reservations.reference(created["id"])}
 
 
 app.include_router(admin_api.router)
