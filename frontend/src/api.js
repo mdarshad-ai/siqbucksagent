@@ -27,3 +27,9 @@ export async function sendChatMessage(agentId, message, history) {
   }
   return res.json();
 }
+
+// Media URLs from local-dev storage are relative to the API; Supabase URLs
+// are absolute already.
+export function assetUrl(url) {
+  return url && url.startsWith("/") ? `${API_URL}${url}` : url;
+}

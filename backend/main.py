@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import admin_api
 import auth
 import database
+import storage
 from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat
 
 logger = logging.getLogger(__name__)
@@ -26,8 +27,17 @@ if os.environ.get("RENDER") and not os.environ.get("DATABASE_URL"):
         "persona and user changes will be lost on restart. Set DATABASE_URL "
         "to your Supabase connection string."
     )
+if os.environ.get("RENDER") and not os.environ.get("SUPABASE_URL"):
+    logger.warning(
+        "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not set - photos and "
+        "videos are saved to a temporary folder and will be lost on restart."
+    )
 database.init_db()
 auth.bootstrap_owner()
+try:
+    storage.get_storage().ensure_ready()
+except storage.StorageError:
+    logger.exception("Media storage isn't ready - uploads will fail until it is")
 
 app = FastAPI(title="Night Market Sales Agents API")
 
@@ -79,6 +89,16 @@ def chat(req: ChatRequest):
 
 
 app.include_router(admin_api.router)
+
+# Local dev/tests keep uploads on disk; serve them like Supabase's public URLs.
+_store = storage.get_storage()
+if isinstance(_store, storage.LocalStorage):
+    _store.ensure_ready()
+    app.mount(
+        storage.LOCAL_MEDIA_URL_PREFIX,
+        StaticFiles(directory=_store.root),
+        name="media-files",
+    )
 
 
 class SPAStaticFiles(StaticFiles):

@@ -94,6 +94,27 @@ items = Table(
     Column("updated_at", DateTime(timezone=True), nullable=False),
 )
 
+MEDIA_KINDS = ("image", "video", "embed")
+
+media = Table(
+    "media",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("item_id", Integer, ForeignKey("items.id"), nullable=False, index=True),
+    Column("kind", String(16), nullable=False),
+    # Uploaded files: storage paths (see storage.py). Embeds: a YouTube/Vimeo
+    # embed URL and thumbnail instead.
+    Column("path", String(500)),
+    Column("poster_path", String(500)),
+    Column("external_url", String(500)),
+    Column("thumbnail_url", String(500)),
+    Column("content_type", String(80)),
+    Column("size_bytes", Integer),
+    Column("caption", String(300), nullable=False, default=""),
+    Column("position", Integer, nullable=False, default=0),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
 USER_ROLES = ("owner", "staff")
 
 users = Table(
@@ -280,12 +301,24 @@ def search_items(agent_id: str, query: str, limit: int = 20):
         return [dict(r._mapping) for r in conn.execute(stmt).fetchall()]
 
 
-def list_items(agent_id: str):
+def list_items(agent_id: str, with_media_counts: bool = False):
     with get_engine().connect() as conn:
         rows = conn.execute(
             select(items).where(items.c.agent_id == agent_id).order_by(items.c.name)
         ).fetchall()
-    return [dict(r._mapping) for r in rows]
+        result = [dict(r._mapping) for r in rows]
+        if with_media_counts:
+            counts = dict(
+                conn.execute(
+                    select(media.c.item_id, func.count())
+                    .join(items, items.c.id == media.c.item_id)
+                    .where(items.c.agent_id == agent_id)
+                    .group_by(media.c.item_id)
+                ).fetchall()
+            )
+            for item in result:
+                item["media_count"] = counts.get(item["id"], 0)
+    return result
 
 
 def get_item(agent_id: str, item_id):
@@ -325,15 +358,90 @@ def update_item(agent_id: str, item_id: int, fields: dict):
 
 
 def delete_item(agent_id: str, item_id: int):
+    """Delete a stone and its media rows. Returns the deleted media rows (so
+    the caller can remove their files), or None if the stone wasn't found."""
     with get_engine().begin() as conn:
-        result = conn.execute(
-            delete(items).where(items.c.agent_id == agent_id, items.c.id == item_id)
-        )
-    return result.rowcount > 0
+        exists = conn.execute(
+            select(items.c.id).where(items.c.agent_id == agent_id, items.c.id == item_id)
+        ).first()
+        if not exists:
+            return None
+        rows = conn.execute(select(media).where(media.c.item_id == item_id)).fetchall()
+        conn.execute(delete(media).where(media.c.item_id == item_id))
+        conn.execute(delete(items).where(items.c.id == item_id))
+    return [dict(r._mapping) for r in rows]
 
 
 def public_item(item: dict):
     return {k: item[k] for k in ITEM_PUBLIC_FIELDS}
+
+
+# ---------- media ----------
+
+def list_media(item_id: int):
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            select(media).where(media.c.item_id == item_id)
+            .order_by(media.c.position, media.c.id)
+        ).fetchall()
+    return [dict(r._mapping) for r in rows]
+
+
+def get_media(item_id: int, media_id: int):
+    with get_engine().connect() as conn:
+        row = conn.execute(
+            select(media).where(media.c.item_id == item_id, media.c.id == media_id)
+        ).first()
+    return dict(row._mapping) if row else None
+
+
+def create_media(item_id: int, fields: dict):
+    with get_engine().begin() as conn:
+        last = conn.execute(
+            select(func.max(media.c.position)).where(media.c.item_id == item_id)
+        ).scalar()
+        result = conn.execute(
+            insert(media).values(
+                item_id=item_id,
+                position=(last + 1) if last is not None else 0,
+                created_at=_now(),
+                **fields,
+            )
+        )
+        media_id = result.inserted_primary_key[0]
+    return get_media(item_id, media_id)
+
+
+def update_media(item_id: int, media_id: int, fields: dict):
+    with get_engine().begin() as conn:
+        conn.execute(
+            update(media).where(media.c.item_id == item_id, media.c.id == media_id)
+            .values(**fields)
+        )
+    return get_media(item_id, media_id)
+
+
+def reorder_media(item_id: int, ordered_ids: list[int]):
+    """Set positions from the given order. Ids must be exactly the stone's media."""
+    current = {m["id"] for m in list_media(item_id)}
+    if set(ordered_ids) != current or len(ordered_ids) != len(current):
+        return None
+    with get_engine().begin() as conn:
+        for position, media_id in enumerate(ordered_ids):
+            conn.execute(
+                update(media).where(media.c.item_id == item_id, media.c.id == media_id)
+                .values(position=position)
+            )
+    return list_media(item_id)
+
+
+def delete_media(item_id: int, media_id: int):
+    row = get_media(item_id, media_id)
+    if not row:
+        return None
+    with get_engine().begin() as conn:
+        conn.execute(delete(media).where(media.c.id == media_id))
+    return row
 
 
 # ---------- users ----------

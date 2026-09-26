@@ -19,6 +19,12 @@ services:
       # Supabase -> Connect -> "Session pooler" connection string.
       - key: DATABASE_URL
         sync: false
+      # Supabase Storage for stone photos/videos: Project URL, and the
+      # secret (service_role) key from Project Settings -> API Keys.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
       # First owner login for /admin. Only used when there are no users yet.
       - key: ADMIN_EMAIL
         sync: false

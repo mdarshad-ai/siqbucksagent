@@ -1,11 +1,16 @@
 import os
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+# Uploads go to a throwaway folder (main mounts it once at import).
+os.environ.setdefault("MEDIA_DIR", tempfile.mkdtemp(prefix="gem-media-"))
+os.environ.pop("SUPABASE_URL", None)
 
 import database  # noqa: E402
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./adminApi.js";
+import MediaManager from "./MediaManager.jsx";
 
 const EMPTY_STONE = {
   name: "",
@@ -50,7 +51,7 @@ function toPayload(form) {
   };
 }
 
-function StoneForm({ agentId, item, onSaved, onCancel, onDeleted }) {
+function StoneForm({ agentId, item, onSaved, onCancel, onDeleted, onMediaCount }) {
   const [form, setForm] = useState(item ? toForm(item) : EMPTY_STONE);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -86,107 +87,124 @@ function StoneForm({ agentId, item, onSaved, onCancel, onDeleted }) {
   }
 
   return (
-    <form className="admin-card stone-form" onSubmit={save}>
-      <div className="admin-row admin-row-between">
-        <h3>{item ? `Edit: ${item.name}` : "Add a stone"}</h3>
-        <button type="button" className="btn" onClick={onCancel}>
-          Close
-        </button>
-      </div>
-
-      <fieldset>
-        <legend>Basics</legend>
-        <div className="form-grid">
-          <label className="span-2">
-            Name *
-            <input value={form.name} onChange={set("name")} required maxLength={200} />
-          </label>
-          <label>
-            Category
-            <input value={form.category} onChange={set("category")} placeholder="e.g. Sapphire" />
-          </label>
-          <label>
-            Price (USD) *
-            <input type="number" min="0" step="0.01" value={form.price} onChange={set("price")} required />
-          </label>
-          <label>
-            Quantity *
-            <input type="number" min="0" step="1" value={form.quantity} onChange={set("quantity")} required />
-          </label>
-          <label>
-            Status
-            <select value={form.status} onChange={set("status")}>
-              <option value="available">Available</option>
-              <option value="reserved">Reserved (on hold)</option>
-              <option value="sold">Sold</option>
-            </select>
-          </label>
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Stone details</legend>
-        <div className="form-grid">
-          {DETAIL_FIELDS.map(([key, label, type = "text", placeholder]) => (
-            <label key={key}>
-              {label}
-              <input
-                type={type}
-                min={type === "number" ? "0" : undefined}
-                step={type === "number" ? "0.01" : undefined}
-                value={form[key]}
-                onChange={set(key)}
-                placeholder={placeholder}
-              />
-            </label>
-          ))}
-          <label className="span-2">
-            Short description
-            <textarea rows={2} value={form.description} onChange={set("description")} maxLength={2000} />
-          </label>
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Stone memory (what the dealer knows)</legend>
-        <label>
-          Story <span className="admin-muted">— the dealer may tell customers this</span>
-          <textarea
-            rows={4}
-            value={form.story}
-            onChange={set("story")}
-            maxLength={5000}
-            placeholder="Provenance, how it was found, what makes it special, who it suits, how it looks in different light..."
-          />
-        </label>
-        <label>
-          Sales guidance <span className="admin-muted">— private coaching, never quoted to customers</span>
-          <textarea
-            rows={3}
-            value={form.sales_guidance}
-            onChange={set("sales_guidance")}
-            maxLength={5000}
-            placeholder="e.g. Mention the certificate early. Pairs well with the tanzanite."
-          />
-        </label>
-        <p className="admin-hint">
-          Don't put anything truly secret here (like your lowest price). An AI can
-          sometimes be talked into revealing its instructions.
-        </p>
-      </fieldset>
-
-      {error && <div className="admin-error">{error}</div>}
-      <div className="admin-row admin-row-between">
-        <button className="btn btn-primary" disabled={busy}>
-          {busy ? "Saving..." : item ? "Save changes" : "Add stone"}
-        </button>
-        {item && (
-          <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>
-            Delete stone
+    <div className="admin-card stone-form">
+      <form onSubmit={save}>
+        <div className="admin-row admin-row-between">
+          <h3>{item ? `Edit: ${item.name}` : "Add a stone"}</h3>
+          <button type="button" className="btn" onClick={onCancel}>
+            Close
           </button>
+        </div>
+
+        <fieldset>
+          <legend>Basics</legend>
+          <div className="form-grid">
+            <label className="span-2">
+              Name *
+              <input value={form.name} onChange={set("name")} required maxLength={200} />
+            </label>
+            <label>
+              Category
+              <input value={form.category} onChange={set("category")} placeholder="e.g. Sapphire" />
+            </label>
+            <label>
+              Price (USD) *
+              <input type="number" min="0" step="0.01" value={form.price} onChange={set("price")} required />
+            </label>
+            <label>
+              Quantity *
+              <input type="number" min="0" step="1" value={form.quantity} onChange={set("quantity")} required />
+            </label>
+            <label>
+              Status
+              <select value={form.status} onChange={set("status")}>
+                <option value="available">Available</option>
+                <option value="reserved">Reserved (on hold)</option>
+                <option value="sold">Sold</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Stone details</legend>
+          <div className="form-grid">
+            {DETAIL_FIELDS.map(([key, label, type = "text", placeholder]) => (
+              <label key={key}>
+                {label}
+                <input
+                  type={type}
+                  min={type === "number" ? "0" : undefined}
+                  step={type === "number" ? "0.01" : undefined}
+                  value={form[key]}
+                  onChange={set(key)}
+                  placeholder={placeholder}
+                />
+              </label>
+            ))}
+            <label className="span-2">
+              Short description
+              <textarea rows={2} value={form.description} onChange={set("description")} maxLength={2000} />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Stone memory (what the dealer knows)</legend>
+          <label>
+            Story <span className="admin-muted">— the dealer may tell customers this</span>
+            <textarea
+              rows={4}
+              value={form.story}
+              onChange={set("story")}
+              maxLength={5000}
+              placeholder="Provenance, how it was found, what makes it special, who it suits, how it looks in different light..."
+            />
+          </label>
+          <label>
+            Sales guidance <span className="admin-muted">— private coaching, never quoted to customers</span>
+            <textarea
+              rows={3}
+              value={form.sales_guidance}
+              onChange={set("sales_guidance")}
+              maxLength={5000}
+              placeholder="e.g. Mention the certificate early. Pairs well with the tanzanite."
+            />
+          </label>
+          <p className="admin-hint">
+            Don't put anything truly secret here (like your lowest price). An AI can
+            sometimes be talked into revealing its instructions.
+          </p>
+        </fieldset>
+
+        {error && <div className="admin-error">{error}</div>}
+        <div className="admin-row admin-row-between">
+          <button className="btn btn-primary" disabled={busy}>
+            {busy ? "Saving..." : item ? "Save changes" : "Add stone"}
+          </button>
+          {item && (
+            <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>
+              Delete stone
+            </button>
+          )}
+        </div>
+      </form>
+
+      <fieldset className="media-fieldset">
+        <legend>Photos &amp; videos</legend>
+        {item ? (
+          <>
+            <p className="admin-hint media-intro">
+              Customers see these on the stone's card when the dealer recommends it. Changes here save
+              straight away.
+            </p>
+            <MediaManager agentId={agentId} itemId={item.id} onCountChange={onMediaCount} />
+          </>
+        ) : (
+          <p className="admin-muted">Add the stone first, then you can upload photos and videos.</p>
         )}
-      </div>
-    </form>
+      </fieldset>
+    </div>
   );
 }
 
@@ -227,12 +245,19 @@ export default function InventoryTab() {
   }, [items, filter]);
 
   function handleSaved(saved) {
+    const isNew = !items.some((i) => i.id === saved.id);
     setItems((prev) => {
-      const exists = prev.some((i) => i.id === saved.id);
-      const next = exists ? prev.map((i) => (i.id === saved.id ? saved : i)) : [...prev, saved];
+      const old = prev.find((i) => i.id === saved.id);
+      const merged = { ...saved, media_count: old?.media_count ?? 0 };
+      const next = old ? prev.map((i) => (i.id === saved.id ? merged : i)) : [...prev, merged];
       return next.sort((a, b) => a.name.localeCompare(b.name));
     });
-    setEditing(null);
+    // A new stone stays open so photos and videos can be added right away.
+    setEditing(isNew ? { ...saved, media_count: 0 } : null);
+  }
+
+  function handleMediaCount(itemId, count) {
+    setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, media_count: count } : i)));
   }
 
   return (
@@ -271,6 +296,7 @@ export default function InventoryTab() {
           item={editing === "new" ? null : editing}
           onSaved={handleSaved}
           onCancel={() => setEditing(null)}
+          onMediaCount={(count) => editing !== "new" && handleMediaCount(editing.id, count)}
           onDeleted={(id) => {
             setItems((prev) => prev.filter((i) => i.id !== id));
             setEditing(null);
@@ -287,6 +313,7 @@ export default function InventoryTab() {
               <th className="num">Price</th>
               <th className="num">Qty</th>
               <th>Status</th>
+              <th>Media</th>
               <th>Memory</th>
             </tr>
           </thead>
@@ -305,6 +332,9 @@ export default function InventoryTab() {
                 <td>
                   <span className={`pill pill-${i.status}`}>{i.status}</span>
                 </td>
+                <td className={i.media_count ? "" : "admin-muted"}>
+                  {i.media_count ? `${i.media_count}` : "none"}
+                </td>
                 <td className="admin-muted">
                   {[i.story && "story", i.sales_guidance && "guidance"].filter(Boolean).join(", ") || "—"}
                 </td>
@@ -312,7 +342,7 @@ export default function InventoryTab() {
             ))}
             {!loading && visible.length === 0 && (
               <tr>
-                <td colSpan={6} className="admin-muted">
+                <td colSpan={7} className="admin-muted">
                   {items.length ? "No stones match that filter." : "No stones yet."}
                 </td>
               </tr>

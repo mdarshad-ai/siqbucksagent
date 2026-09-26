@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sendChatMessage } from "../api.js";
+import StoneCard from "./StoneCard.jsx";
 
 export default function ChatPanel({ agent, history, setHistory, onTalkingChange }) {
   const [input, setInput] = useState("");
@@ -53,8 +54,15 @@ export default function ChatPanel({ agent, history, setHistory, onTalkingChange 
           </div>
         )}
         {history.map((turn, i) => (
-          <div key={i} className={`chat-bubble chat-bubble-${turn.role}`}>
-            {turn.content}
+          <div key={i} className={`chat-turn chat-turn-${turn.role}`}>
+            <div className={`chat-bubble chat-bubble-${turn.role}`}>{turn.content}</div>
+            {turn.cards?.length > 0 && (
+              <div className="stone-cards">
+                {turn.cards.map((card) => (
+                  <StoneCard key={card.id} card={card} />
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {loading && (

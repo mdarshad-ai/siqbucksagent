@@ -494,3 +494,142 @@
     flex: 1 1 100%;
   }
 }
+
+/* ---------- media ---------- */
+
+.admin-warning {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.4rem;
+  font-size: 0.88rem;
+}
+
+.btn-small {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.82rem;
+}
+
+.media-fieldset {
+  margin-top: 1.25rem !important;
+  padding-bottom: 1rem !important;
+}
+
+.media-intro {
+  margin: 0 0 0.75rem;
+}
+
+.upload-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.progress {
+  height: 6px;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: var(--bg-deep);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+  margin: 0.9rem 0 0.25rem;
+}
+
+.media-tile {
+  background: var(--bg-deep);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-tile-dragging {
+  opacity: 0.4;
+}
+
+.media-tile-preview {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  cursor: grab;
+}
+
+.media-tile-main,
+.media-tile-kind {
+  position: absolute;
+  top: 0.4rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
+.media-tile-main {
+  left: 0.4rem;
+  background: var(--accent);
+  color: #0b0c14;
+}
+
+.media-tile-kind {
+  right: 0.4rem;
+}
+
+.admin-root .media-caption {
+  border: none;
+  border-top: 1px solid var(--panel-border);
+  border-radius: 0;
+  font-size: 0.85rem;
+}
+
+.media-tile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.45rem;
+}
+
+.media-link-row {
+  margin-top: 0.9rem;
+}
+
+.admin-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(5, 6, 10, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.admin-modal-body {
+  width: min(100%, 720px);
+  margin: 0;
+}
+
+.still-frame-video {
+  width: 100%;
+  max-height: 60vh;
+  background: #000;
+  border-radius: 8px;
+  margin: 0.5rem 0 0.75rem;
+}

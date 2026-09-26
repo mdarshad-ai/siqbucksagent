@@ -5,6 +5,7 @@ from pathlib import Path
 from openai import OpenAI
 
 import database
+from media import stone_card
 from agent_config import compose_system_prompt
 
 DEFAULT_MODEL = "anthropic/claude-sonnet-4.5"
@@ -52,7 +53,28 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "show_item",
+            "description": (
+                "Show the customer a card for a stone you are recommending, "
+                "with its photos, videos, price and key details. Call it for "
+                "each stone you actually recommend (at most 3 per reply), not "
+                "for every stone you mention. It fails for sold-out stones."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "integer", "description": "The stone's id."}
+                },
+                "required": ["item_id"],
+            },
+        },
+    },
 ]
+
+MAX_CARDS_PER_REPLY = 3
 
 _client = None
 
@@ -105,7 +127,8 @@ SEARCH_SUMMARY_FIELDS = (
 DETAIL_FIELDS = database.ITEM_PUBLIC_FIELDS + ("story", "sales_guidance")
 
 
-def _run_tool(agent_id: str, tool_name: str, tool_args: dict):
+def _run_tool(agent_id: str, tool_name: str, tool_args: dict, shown: list | None = None):
+    """Run one tool call. shown collects stone cards from show_item."""
     if tool_name == "search_inventory":
         results = database.search_items(agent_id, tool_args.get("query", ""))
         summaries = [{k: r[k] for k in SEARCH_SUMMARY_FIELDS} for r in results]
@@ -115,6 +138,19 @@ def _run_tool(agent_id: str, tool_name: str, tool_args: dict):
         if not item:
             return json.dumps({"error": "not found"})
         return json.dumps({"item": {k: item[k] for k in DETAIL_FIELDS}})
+    if tool_name == "show_item":
+        item = database.get_item(agent_id, tool_args.get("item_id"))
+        if not item:
+            return json.dumps({"error": "not found"})
+        if item["status"] == "sold" or item["quantity"] <= 0:
+            return json.dumps({"error": "sold out - don't show or recommend it"})
+        shown = shown if shown is not None else []
+        if any(card["id"] == item["id"] for card in shown):
+            return json.dumps({"ok": True, "note": "already shown"})
+        if len(shown) >= MAX_CARDS_PER_REPLY:
+            return json.dumps({"error": f"at most {MAX_CARDS_PER_REPLY} cards per reply"})
+        shown.append(stone_card(item))
+        return json.dumps({"ok": True, "media_count": len(shown[-1]["media"])})
     return json.dumps({"error": f"unknown tool {tool_name}"})
 
 
@@ -123,9 +159,10 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_over
     history: list of {"role": "user"|"assistant", "content": str} from prior
     turns (plain text only - this is what the frontend stores and replays).
 
-    Returns: (reply_text, updated_history) where updated_history is the same
-    plain-text shape with this turn appended. Any tool-call exchange happens
-    only within this single call and is not persisted.
+    Returns: (reply_text, updated_history, cards). updated_history is the same
+    plain-text shape with this turn appended; cards are the stones the agent
+    chose to show (show_item) during this reply. Any tool-call exchange
+    happens only within this single call and is not persisted.
 
     agent_override: optional dict with persona/selling_rules to use instead of
     the published ones (the admin "preview" chat). Tools still run against
@@ -154,6 +191,7 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_over
     reply_text = "Sorry, I'm having trouble looking that up right now."
 
     client = _get_client()
+    cards = []
 
     for _ in range(8):  # search + details for a few stones
         response = client.chat.completions.create(
@@ -194,7 +232,7 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_over
                 args = json.loads(tc.function.arguments or "{}")
             except json.JSONDecodeError:
                 args = {}
-            result = _run_tool(agent_id, tc.function.name, args)
+            result = _run_tool(agent_id, tc.function.name, args, shown=cards)
             messages.append(
                 {
                     "role": "tool",
@@ -205,4 +243,4 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_over
 
     plain_history.append({"role": "user", "content": message})
     plain_history.append({"role": "assistant", "content": reply_text})
-    return reply_text, plain_history
+    return reply_text, plain_history, cards
