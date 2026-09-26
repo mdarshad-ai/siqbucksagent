@@ -163,19 +163,120 @@ def _run_tool(agent_id: str, tool_name: str, tool_args: dict, shown: list | None
     return json.dumps({"error": f"unknown tool {tool_name}"})
 
 
-def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_override=None):
+TERMINAL_TOOLS = {"suggest_replies", "refer_to_partner"}
+MAX_SUGGESTIONS = 3
+
+
+def build_tools(partners: list[dict]):
+    """The fixed tools plus the two whose options depend on the partners."""
+    tools = list(TOOLS) + [
+        {
+            "type": "function",
+            "function": {
+                "name": "suggest_replies",
+                "description": (
+                    "Offer the customer 2-3 short follow-up questions they can "
+                    "tap, written in their voice (e.g. 'Show me it in "
+                    "daylight', 'Anything cheaper?'). Call this together with "
+                    "your final message of each reply."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "options": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "2-3 options, each under 8 words.",
+                        }
+                    },
+                    "required": ["options"],
+                },
+            },
+        }
+    ]
+    if partners:
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "refer_to_partner",
+                    "description": (
+                        "Offer to hand the customer over to your partner when "
+                        "what they want fits the partner's line better than "
+                        "yours. The customer sees a button to continue with "
+                        "the partner, who receives customer_request."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "partner_id": {"type": "string", "enum": [p["id"] for p in partners]},
+                            "customer_request": {
+                                "type": "string",
+                                "description": (
+                                    "What the customer wants, in their voice, "
+                                    "e.g. 'I'm after amethyst under $30.'"
+                                ),
+                            },
+                        },
+                        "required": ["partner_id", "customer_request"],
+                    },
+                },
+            }
+        )
+    return tools
+
+
+def _terminal_tool(tool_name, args, partners, state):
+    """suggest_replies / refer_to_partner: they only shape the UI."""
+    if tool_name == "suggest_replies":
+        options = [str(o).strip()[:80] for o in (args.get("options") or []) if str(o).strip()]
+        state["suggestions"] = options[:MAX_SUGGESTIONS]
+        return {"type": "suggestions", "options": state["suggestions"]}
+    partner = next((p for p in partners if p["id"] == args.get("partner_id")), None)
+    request = str(args.get("customer_request") or "").strip()[:300]
+    if not partner or not request:
+        return None
+    state["handoff"] = {
+        "to": partner["id"],
+        "display_name": partner["display_name"],
+        "stall_name": partner["stall_name"],
+        "message": request,
+    }
+    return {"type": "handoff", **state["handoff"]}
+
+
+def _stream_completion(client, **kwargs):
+    """Yield ("text", str) as it arrives, then ("tool_calls", [...])."""
+    calls = {}
+    for chunk in client.chat.completions.create(stream=True, **kwargs):
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        if getattr(delta, "content", None):
+            yield "text", delta.content
+        for tc in getattr(delta, "tool_calls", None) or []:
+            call = calls.setdefault(tc.index, {"id": None, "name": "", "arguments": ""})
+            if tc.id:
+                call["id"] = tc.id
+            if tc.function and tc.function.name:
+                call["name"] += tc.function.name
+            if tc.function and tc.function.arguments:
+                call["arguments"] += tc.function.arguments
+    yield "tool_calls", [calls[i] for i in sorted(calls)]
+
+
+def stream_agent(agent_id: str, message: str, history: list[dict], agent_override=None):
     """
-    history: list of {"role": "user"|"assistant", "content": str} from prior
-    turns (plain text only - this is what the frontend stores and replays).
+    Run one customer turn, yielding events as they happen:
+      {"type": "delta", "text"}          reply text, streamed
+      {"type": "card", "card"}           a stone card (show_item)
+      {"type": "suggestions", "options"} tappable follow-ups
+      {"type": "handoff", "to", ...}     offer to continue with the partner
+      {"type": "done", "reply", "cards", "suggestions", "handoff"}
 
-    Returns: (reply_text, updated_history, cards). updated_history is the same
-    plain-text shape with this turn appended; cards are the stones the agent
-    chose to show (show_item) during this reply. Any tool-call exchange
-    happens only within this single call and is not persisted.
-
-    agent_override: optional dict with persona/selling_rules to use instead of
-    the published ones (the admin "preview" chat). Tools still run against
-    agent_id's real inventory.
+    history: plain {"role", "content"} turns from the client.
+    agent_override: persona/selling_rules for the admin preview; tools still
+    use agent_id's real inventory.
     """
     agent = database.get_agent(agent_id)
     if agent and agent_override:
@@ -190,78 +291,89 @@ def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_over
         )
 
     model = os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
+    partners = [a for a in database.list_agents() if a["id"] != agent_id]
+    tools = build_tools(partners)
 
-    plain_history = [{"role": h["role"], "content": h["content"]} for h in history]
-
-    messages = [{"role": "system", "content": compose_system_prompt(agent)}]
-    messages.extend(plain_history)
+    messages = [{"role": "system", "content": compose_system_prompt(agent, partners)}]
+    messages.extend({"role": h["role"], "content": h["content"]} for h in history)
     messages.append({"role": "user", "content": message})
-
-    reply_text = "Sorry, I'm having trouble looking that up right now."
-    # Some models say their piece alongside a tool call and then finish with
-    # an empty message, so keep any text they produce along the way.
-    interim_text = []
 
     client = _get_client()
     cards = []
+    state = {"suggestions": [], "handoff": None}
+    # Models may talk alongside a tool call and then finish with an empty
+    # message, so every piece of text counts toward the reply.
+    segments = []
 
     for _ in range(8):  # search + details for a few stones
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=TOOLS,
-            extra_headers=_extra_headers(),
-        )
-        choice = response.choices[0]
-        msg = choice.message
-
-        if not msg.tool_calls:
-            final = (msg.content or "").strip()
-            if final:
-                reply_text = final
-            elif interim_text:
-                reply_text = "\n\n".join(interim_text)
-            elif cards:
-                reply_text = "Have a look at this one below."
+        text = ""
+        tool_calls = []
+        for kind, value in _stream_completion(
+            client, model=model, messages=messages, tools=tools, extra_headers=_extra_headers()
+        ):
+            if kind == "text":
+                if not text and segments:
+                    yield {"type": "delta", "text": "\n\n"}
+                text += value
+                yield {"type": "delta", "text": value}
+            else:
+                tool_calls = value
+        if text.strip():
+            segments.append(text.strip())
+        if not tool_calls:
             break
 
-        if (msg.content or "").strip():
-            interim_text.append(msg.content.strip())
-
-        # Record the assistant's tool-call turn, then run each tool and feed
-        # results back in as "tool" role messages.
         messages.append(
             {
                 "role": "assistant",
-                "content": msg.content,
+                "content": text or None,
                 "tool_calls": [
                     {
-                        "id": tc.id,
+                        "id": tc["id"],
                         "type": "function",
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        },
+                        "function": {"name": tc["name"], "arguments": tc["arguments"] or "{}"},
                     }
-                    for tc in msg.tool_calls
+                    for tc in tool_calls
                 ],
             }
         )
-
-        for tc in msg.tool_calls:
+        for tc in tool_calls:
             try:
-                args = json.loads(tc.function.arguments or "{}")
+                args = json.loads(tc["arguments"] or "{}")
             except json.JSONDecodeError:
                 args = {}
-            result = _run_tool(agent_id, tc.function.name, args, shown=cards)
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": result,
-                }
-            )
+            if tc["name"] in TERMINAL_TOOLS:
+                event = _terminal_tool(tc["name"], args, partners, state)
+                if event:
+                    yield event
+                result = json.dumps({"ok": bool(event)})
+            else:
+                before = len(cards)
+                result = _run_tool(agent_id, tc["name"], args, shown=cards)
+                for card in cards[before:]:
+                    yield {"type": "card", "card": card}
+            messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
 
-    plain_history.append({"role": "user", "content": message})
-    plain_history.append({"role": "assistant", "content": reply_text})
-    return reply_text, plain_history, cards
+        # suggest_replies / refer_to_partner come with the final message, so
+        # there's nothing left to ask the model.
+        if all(tc["name"] in TERMINAL_TOOLS for tc in tool_calls):
+            break
+
+    reply = "\n\n".join(segments)
+    if not reply:
+        if cards:
+            reply = "Have a look at this one below."
+        elif state["handoff"]:
+            reply = f"{state['handoff']['display_name']} is the one to ask about that."
+        else:
+            reply = "Sorry, I'm having trouble looking that up right now."
+        yield {"type": "delta", "text": reply}
+    yield {"type": "done", "reply": reply, "cards": cards, **state}
+
+
+def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_override=None):
+    """Non-streaming version of stream_agent: returns its final "done" event."""
+    for event in stream_agent(agent_id, message, history, agent_override=agent_override):
+        if event["type"] == "done":
+            return event
+    raise RuntimeError("The chat ended without a reply")

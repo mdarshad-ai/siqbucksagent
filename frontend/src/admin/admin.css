@@ -820,3 +820,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+.admin-root label.check-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 400;
+}
+
+.admin-root label.check-row input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.featured-star {
+  color: #d9b56c;
+}

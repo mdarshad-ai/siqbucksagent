@@ -35,6 +35,9 @@ CORE_RULES = (
     "customer wants a stone, call show_item with suggest_reserve true and "
     "invite them to use the 'Reserve this stone' button on its card; the shop "
     "then contacts them to confirm the hold. Never promise a hold yourself.\n"
+    "- End every reply by calling suggest_replies with 2-3 short follow-ups "
+    "the customer might tap next, in their voice.\n"
+    "- Write plain conversational text; no headings, lists or tables.\n"
     "- Never claim a discount, price change, or guarantee the tools don't "
     "support."
 )
@@ -103,11 +106,25 @@ DEFAULT_AGENTS = {
 AGENT_ORDER = list(DEFAULT_AGENTS)
 
 
-def compose_system_prompt(agent: dict) -> str:
-    """Editable persona + selling rules, then the locked core rules."""
+BRAND_NAME = "Loupe Gem"
+
+
+def compose_system_prompt(agent: dict, partners=()) -> str:
+    """Editable persona + selling rules, who the partners are, then the
+    locked core rules."""
     parts = [agent["persona"].strip()]
     if agent.get("selling_rules", "").strip():
         parts.append("How you sell:\n" + agent["selling_rules"].strip())
+    if partners:
+        lines = "\n".join(
+            f"- {p['display_name']} ({p['stall_name']}): {p['tagline']}" for p in partners
+        )
+        parts.append(
+            f"You are one of the gem partners at {BRAND_NAME}. Your partners:\n{lines}\n"
+            "If what the customer wants clearly fits a partner's line better "
+            "than yours, say so warmly and call refer_to_partner. Don't claim "
+            "to know what they have in stock."
+        )
     parts.append(CORE_RULES)
     return "\n\n".join(parts)
 

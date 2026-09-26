@@ -9,6 +9,7 @@ load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field, StringConstraints
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -17,9 +18,11 @@ import admin_api
 import auth
 import database
 import limits
+import media
 import reservations
+import routing
 import storage
-from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat
+from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat, stream_chat
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,7 @@ try:
 except storage.StorageError:
     logger.exception("Media storage isn't ready - uploads will fail until it is")
 
-app = FastAPI(title="Night Market Sales Agents API")
+app = FastAPI(title="Loupe Gem API")
 
 origins_env = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 origins = [o.strip() for o in origins_env.split(",") if o.strip()]
@@ -92,6 +95,48 @@ def chat(req: ChatRequest, request: Request):
     limits.check_chat_allowed(request)
     reservations.sweep()  # expire old holds so the dealer sees current stock
     return run_chat(req.agent_id, req.message, req.history)
+
+
+@app.post("/api/chat/stream")
+def chat_stream(req: ChatRequest, request: Request):
+    """Same as /api/chat, but the reply streams in as server-sent events."""
+    if not database.get_agent(req.agent_id):
+        raise HTTPException(status_code=404, detail="Unknown agent")
+    limits.check_chat_allowed(request)
+    reservations.sweep()
+    return StreamingResponse(
+        stream_chat(req.agent_id, req.message, req.history),
+        media_type="text/event-stream",
+        # Don't let proxies buffer the stream.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+class RouteRequest(BaseModel):
+    message: NonEmptyStr = Field(max_length=2000)
+
+
+@app.post("/api/route")
+def route(req: RouteRequest):
+    """Pick which partner should answer an opening question (no AI call)."""
+    return {"agent_id": routing.pick_agent(req.message)}
+
+
+@app.get("/api/featured")
+def featured():
+    """'On the counter tonight': stones the shop has chosen to feature."""
+    agents = {a["id"]: a for a in database.list_agents()}
+    stones = []
+    for item in database.list_featured_items(limit=4):
+        agent = agents.get(item["agent_id"])
+        if agent:
+            stones.append(
+                {
+                    **media.stone_card(item),
+                    "agent": {k: agent[k] for k in ("id", "display_name", "stall_name", "theme")},
+                }
+            )
+    return stones
 
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True)]
