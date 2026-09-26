@@ -1,0 +1,6 @@
+.env
+token.txt
+*.token
+__pycache__/
+*.pyc
+inventory.db
