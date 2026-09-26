@@ -29,6 +29,7 @@ export default function ChatPanel({ agent, history, setHistory, onTalkingChange 
     } catch (err) {
       setError(err.message);
       setHistory(history); // roll back optimistic update on failure
+      setInput(message); // give the user their text back so they can retry
     } finally {
       setLoading(false);
       onTalkingChange(false);

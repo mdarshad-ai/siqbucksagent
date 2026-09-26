@@ -76,6 +76,16 @@ npm run dev
 
 Open http://localhost:5173 — you should see two lantern-lit counters.
 
+### Tests
+
+The backend tests mock the model, so they need no API key or network:
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## 3. How it works
 
 - `backend/agent_config.py` — each agent's persona (system prompt) and
