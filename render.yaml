@@ -1,6 +1,7 @@
 # Render Blueprint: one free web service that serves both the API and the
-# built frontend (see Dockerfile). In Render: New -> Blueprint -> pick this
-# repo, then paste your OpenRouter key when prompted.
+# built frontend (see Dockerfile). Data lives in Supabase Postgres.
+# In Render: New -> Blueprint -> pick this repo, then fill in the values
+# marked sync: false when prompted.
 services:
   - type: web
     name: gem-exchange
@@ -15,3 +16,14 @@ services:
         value: anthropic/claude-sonnet-4.5
       - key: OPENROUTER_SITE_NAME
         value: Gem Exchange Demo
+      # Supabase -> Connect -> "Session pooler" connection string.
+      - key: DATABASE_URL
+        sync: false
+      # First owner login for /admin. Only used when there are no users yet.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Signs admin login tokens.
+      - key: ADMIN_JWT_SECRET
+        generateValue: true
