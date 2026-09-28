@@ -144,7 +144,12 @@ def _run_tool(agent_id: str, tool_name: str, tool_args: dict, shown: list | None
         item = database.get_item(agent_id, tool_args.get("item_id"))
         if not item:
             return json.dumps({"error": "not found"})
-        return json.dumps({"item": {k: item[k] for k in DETAIL_FIELDS}})
+        details = {k: item[k] for k in DETAIL_FIELDS}
+        details["certificates"] = [
+            " ".join(filter(None, (c["lab"], c["title"], c["number"])))
+            for c in database.list_certificates(item["id"])
+        ]
+        return json.dumps({"item": details})
     if tool_name == "show_item":
         item = database.get_item(agent_id, tool_args.get("item_id"))
         if not item:

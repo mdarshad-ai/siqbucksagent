@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./adminApi.js";
+import CertificatesManager from "./CertificatesManager.jsx";
 import MediaManager from "./MediaManager.jsx";
 
 const EMPTY_STONE = {
@@ -18,6 +19,7 @@ const EMPTY_STONE = {
   description: "",
   story: "",
   sales_guidance: "",
+  sku: "",
   featured: false,
 };
 
@@ -108,6 +110,10 @@ function StoneForm({ agentId, item, onSaved, onCancel, onDeleted, onMediaCount }
             <label>
               Category
               <input value={form.category} onChange={set("category")} placeholder="e.g. Sapphire" />
+            </label>
+            <label>
+              Stock code
+              <input value={form.sku} onChange={set("sku")} maxLength={40} placeholder="Automatic if blank" />
             </label>
             <label>
               Price (USD) *
@@ -204,7 +210,7 @@ function StoneForm({ agentId, item, onSaved, onCancel, onDeleted, onMediaCount }
         {item ? (
           <>
             <p className="admin-hint media-intro">
-              Customers see these on the stone's card when the dealer recommends it. Changes here save
+              Customers see these on the stone's page and on its card in the chat. Changes here save
               straight away.
             </p>
             <MediaManager agentId={agentId} itemId={item.id} onCountChange={onMediaCount} />
@@ -213,6 +219,13 @@ function StoneForm({ agentId, item, onSaved, onCancel, onDeleted, onMediaCount }
           <p className="admin-muted">Add the stone first, then you can upload photos and videos.</p>
         )}
       </fieldset>
+
+      {item && (
+        <fieldset className="media-fieldset">
+          <legend>Certificates</legend>
+          <CertificatesManager agentId={agentId} itemId={item.id} />
+        </fieldset>
+      )}
     </div>
   );
 }

@@ -28,6 +28,9 @@ class ChatMessage(BaseModel):
     cards: list[dict] | None = None
     suggestions: list[str] | None = None
     handoff: dict | None = None
+    # The implicit opening question on a stone page: part of the history the
+    # model sees, but not shown as a bubble.
+    hidden: bool | None = None
 
 
 class ChatResponse(BaseModel):

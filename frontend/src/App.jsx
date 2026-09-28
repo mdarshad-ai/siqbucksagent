@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAgents, fetchFeatured, routeQuestion, streamChat } from "./api.js";
 import { friendlyChatError } from "./chatErrors.js";
 import { loadHistory, saveHistory } from "./chatStore.js";
+import CataloguePage from "./catalogue/CataloguePage.jsx";
+import StonePage from "./catalogue/StonePage.jsx";
 import CounterView from "./counter/CounterView.jsx";
+import { matchRoute, useLocation } from "./router.jsx";
 import {
   ClosingCall,
   Hero,
@@ -25,6 +28,13 @@ export default function App() {
   const [errors, setErrors] = useState({});
   const [showFloat, setShowFloat] = useState(false);
   const busyRef = useRef(false);
+  const location = useLocation();
+  const route = matchRoute(location.path);
+
+  // Following a link (e.g. "View details" on a stone card) closes the chat.
+  useEffect(() => {
+    setCounterId(null);
+  }, [location.path]);
 
   useEffect(() => {
     fetchAgents()
@@ -118,18 +128,24 @@ export default function App() {
 
   return (
     <div className="site">
-      <SiteHeader onTalk={() => openCounter()} />
+      <SiteHeader onTalk={() => openCounter()} current={route.name} />
       <main>
         {loadError && (
           <div className="site-container load-error">
             We couldn't open the shop just now ({loadError}). Please refresh in a moment.
           </div>
         )}
-        <Hero agents={agents} onAsk={askFromSite} onTalk={(id) => openCounter(id)} />
-        <Partners agents={agents} onTalk={(id) => openCounter(id)} onAskPartner={openCounter} />
-        <OnTheCounter stones={featured} onAskPartner={openCounter} />
-        <HowItWorks />
-        <ClosingCall onAsk={askFromSite} />
+        {route.name === "catalogue" && <CataloguePage agents={agents} search={location.search} />}
+        {route.name === "stone" && <StonePage id={route.id} onHandoff={handoff} />}
+        {route.name === "home" && (
+          <>
+            <Hero agents={agents} onAsk={askFromSite} onTalk={(id) => openCounter(id)} />
+            <Partners agents={agents} onTalk={(id) => openCounter(id)} onAskPartner={openCounter} />
+            <OnTheCounter stones={featured} />
+            <HowItWorks />
+            <ClosingCall onAsk={askFromSite} />
+          </>
+        )}
       </main>
       <SiteFooter />
 

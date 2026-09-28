@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getRequested, rememberRequested } from "../api.js";
+import { Link } from "../router.jsx";
 import { Lightbox, MediaThumb, MediaView } from "./MediaViewer.jsx";
 import ReserveModal from "./ReserveModal.jsx";
 
@@ -66,6 +67,9 @@ export default function StoneCard({ card, getTranscript = () => [] }) {
           {formatPrice(card.price)} <span className="stone-card-stock">· {stockLabel(card)}</span>
         </div>
         {details.length > 0 && <div className="stone-card-details">{details.join(" · ")}</div>}
+        <Link to={`/stones/${card.id}`} className="stone-card-link">
+          View full details <span aria-hidden="true">→</span>
+        </Link>
         {requested ? (
           <div className="stone-card-requested">✓ Reservation requested · {requested}</div>
         ) : (

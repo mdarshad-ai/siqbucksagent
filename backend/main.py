@@ -19,6 +19,7 @@ import auth
 import database
 import limits
 import media
+import pitch
 import reservations
 import routing
 import storage
@@ -120,6 +121,64 @@ class RouteRequest(BaseModel):
 def route(req: RouteRequest):
     """Pick which partner should answer an opening question (no AI call)."""
     return {"agent_id": routing.pick_agent(req.message)}
+
+
+@app.get("/api/catalog")
+def catalog(
+    agent: str | None = None,
+    category: str | None = None,
+    q: str = "",
+    min_price: float | None = None,
+    max_price: float | None = None,
+    include_reserved: bool = True,
+    sort: Literal["newest", "price_asc", "price_desc", "carat_desc"] = "newest",
+    limit: int = 24,
+    offset: int = 0,
+):
+    """The browsable catalogue: one photo per stone, never sold-out stones."""
+    reservations.sweep()
+    limit = max(1, min(limit, 60))
+    rows, total, categories = database.list_catalog(
+        agent_id=agent, category=category, query=q[:200], min_price=min_price,
+        max_price=max_price, include_reserved=include_reserved, sort=sort,
+        limit=limit, offset=max(0, offset),
+    )
+    agents = {a["id"]: a for a in database.list_agents()}
+    images = database.first_images([r["id"] for r in rows])
+    return {
+        "total": total,
+        "categories": categories,
+        "items": [media.catalog_entry(r, images.get(r["id"]), agents[r["agent_id"]]) for r in rows if r["agent_id"] in agents],
+    }
+
+
+def _public_stone(stone_id: int):
+    item = database.get_public_item(stone_id)
+    agent = database.get_agent(item["agent_id"]) if item else None
+    if not item or not agent:
+        raise HTTPException(status_code=404, detail="This stone isn't available.")
+    return item, agent
+
+
+@app.get("/api/stones/{stone_id}")
+def stone(stone_id: int):
+    reservations.sweep()
+    item, agent = _public_stone(stone_id)
+    return media.stone_page(item, agent)
+
+
+@app.post("/api/stones/{stone_id}/pitch")
+def stone_pitch(stone_id: int, request: Request):
+    """The partner's opening pitch as server-sent events. A saved pitch is
+    replayed for free; writing a new one counts toward the chat limits."""
+    item, agent = _public_stone(stone_id)
+    if not pitch.cached(item, agent):
+        limits.check_chat_allowed(request)
+    return StreamingResponse(
+        pitch.stream_pitch(item, agent),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/featured")

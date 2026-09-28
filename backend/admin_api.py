@@ -149,6 +149,7 @@ class ItemFields(BaseModel):
     story: Text = Field(default="", max_length=5000)
     sales_guidance: Text = Field(default="", max_length=5000)
     featured: bool = False
+    sku: Text = Field(default="", max_length=40)
 
 
 @router.get("/agents/{agent_id}/items")
@@ -217,7 +218,7 @@ def _check_uploaded(item_id: int, path: str | None):
 class UploadRequest(BaseModel):
     content_type: str
     size_bytes: int = Field(gt=0)
-    purpose: Literal["media", "poster"] = "media"
+    purpose: Literal["media", "poster", "certificate"] = "media"
 
 
 class MediaCreate(BaseModel):
@@ -242,10 +243,34 @@ class MediaOrder(BaseModel):
     ids: list[int]
 
 
+def _admin_media_list(item):
+    return [
+        {**media.admin_media(m), "is_catalog": m["id"] == item.get("catalog_media_id")}
+        for m in database.list_media(item["id"])
+    ]
+
+
 @router.get("/agents/{agent_id}/items/{item_id}/media")
 def list_item_media(agent_id: str, item_id: int, user: dict = Depends(auth.current_user)):
+    return _admin_media_list(_require_item(agent_id, item_id))
+
+
+class CatalogImage(BaseModel):
+    media_id: int | None = None
+
+
+@router.put("/agents/{agent_id}/items/{item_id}/catalog-image")
+def set_catalog_image(
+    agent_id: str, item_id: int, req: CatalogImage, user: dict = Depends(auth.current_user)
+):
+    """Pick which photo represents the stone in the catalogue (None = first photo)."""
     _require_item(agent_id, item_id)
-    return [media.admin_media(m) for m in database.list_media(item_id)]
+    if req.media_id is not None:
+        row = database.get_media(item_id, req.media_id)
+        if not row or row["kind"] != "image":
+            raise HTTPException(status_code=400, detail="Choose one of this stone's photos.")
+    database.set_catalog_media(item_id, req.media_id)
+    return _admin_media_list(database.get_item(agent_id, item_id))
 
 
 @router.post("/agents/{agent_id}/items/{item_id}/media/upload-url")
@@ -254,12 +279,19 @@ def create_upload_url(
 ):
     """A short-lived URL the browser uploads one file to directly."""
     _require_item(agent_id, item_id)
-    allowed = storage.IMAGE_TYPES if req.purpose == "poster" else storage.ALLOWED_TYPES
+    allowed = {
+        "poster": storage.IMAGE_TYPES,
+        "certificate": storage.CERTIFICATE_TYPES,
+    }.get(req.purpose, storage.ALLOWED_TYPES)
     ext = allowed.get(req.content_type)
     if not ext:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported file type. Use JPG, PNG or WebP photos, or MP4/MOV/WebM videos.",
+            detail=(
+                "Unsupported file type. Certificates can be PDF, JPG, PNG or WebP."
+                if req.purpose == "certificate"
+                else "Unsupported file type. Use JPG, PNG or WebP photos, or MP4/MOV/WebM videos."
+            ),
         )
     if req.size_bytes > storage.MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail="File is larger than 50 MB.")
@@ -314,7 +346,7 @@ def add_uploaded_media(
             "caption": req.caption,
         },
     )
-    return media.admin_media(row)
+    return {**media.admin_media(row), "is_catalog": False}
 
 
 @router.post("/agents/{agent_id}/items/{item_id}/media/link", status_code=201)
@@ -338,7 +370,7 @@ def add_video_link(
             "caption": req.caption,
         },
     )
-    return media.admin_media(row)
+    return {**media.admin_media(row), "is_catalog": False}
 
 
 @router.patch("/agents/{agent_id}/items/{item_id}/media/{media_id}")
@@ -346,7 +378,7 @@ def update_media(
     agent_id: str, item_id: int, media_id: int, req: MediaUpdate,
     user: dict = Depends(auth.current_user),
 ):
-    _require_item(agent_id, item_id)
+    item = _require_item(agent_id, item_id)
     row = database.get_media(item_id, media_id)
     if not row:
         raise HTTPException(status_code=404, detail="Media not found")
@@ -361,7 +393,7 @@ def update_media(
     updated = database.update_media(item_id, media_id, fields) if fields else row
     if "poster_path" in fields and row["poster_path"] and row["poster_path"] != req.poster_path:
         storage.get_storage().delete([row["poster_path"]])
-    return media.admin_media(updated)
+    return {**media.admin_media(updated), "is_catalog": updated["id"] == item.get("catalog_media_id")}
 
 
 @router.put("/agents/{agent_id}/items/{item_id}/media/order")
@@ -369,10 +401,9 @@ def reorder_media(
     agent_id: str, item_id: int, req: MediaOrder, user: dict = Depends(auth.current_user)
 ):
     _require_item(agent_id, item_id)
-    rows = database.reorder_media(item_id, req.ids)
-    if rows is None:
+    if database.reorder_media(item_id, req.ids) is None:
         raise HTTPException(status_code=400, detail="The order must list each media item once.")
-    return [media.admin_media(m) for m in rows]
+    return _admin_media_list(database.get_item(agent_id, item_id))
 
 
 @router.delete("/agents/{agent_id}/items/{item_id}/media/{media_id}", status_code=204)
@@ -546,3 +577,67 @@ def update_reservation_note(
         raise HTTPException(status_code=404, detail="Request not found")
     updated = database.update_reservation(reservation_id, {"admin_note": req.admin_note})
     return reservations.admin_view(updated)
+
+
+# ---------- certificates (owners and staff) ----------
+
+class CertificateFields(BaseModel):
+    title: Text = Field(default="", max_length=200)
+    lab: Text = Field(default="", max_length=120)
+    number: Text = Field(default="", max_length=120)
+
+
+class CertificateCreate(CertificateFields):
+    path: str = Field(max_length=500)
+    content_type: str
+    size_bytes: int = Field(gt=0)
+
+
+@router.get("/agents/{agent_id}/items/{item_id}/certificates")
+def list_certificates(agent_id: str, item_id: int, user: dict = Depends(auth.current_user)):
+    _require_item(agent_id, item_id)
+    return [media.admin_certificate(c) for c in database.list_certificates(item_id)]
+
+
+@router.post("/agents/{agent_id}/items/{item_id}/certificates", status_code=201)
+def add_certificate(
+    agent_id: str, item_id: int, req: CertificateCreate, user: dict = Depends(auth.current_user)
+):
+    _require_item(agent_id, item_id)
+    if req.content_type not in storage.CERTIFICATE_TYPES:
+        raise HTTPException(status_code=400, detail="Certificates can be PDF, JPG, PNG or WebP.")
+    _check_uploaded(item_id, req.path)
+    row = database.create_certificate(item_id, req.model_dump())
+    return media.admin_certificate(row)
+
+
+class CertificateUpdate(BaseModel):
+    title: Text | None = Field(default=None, max_length=200)
+    lab: Text | None = Field(default=None, max_length=120)
+    number: Text | None = Field(default=None, max_length=120)
+
+
+@router.patch("/agents/{agent_id}/items/{item_id}/certificates/{certificate_id}")
+def update_certificate(
+    agent_id: str, item_id: int, certificate_id: int, req: CertificateUpdate,
+    user: dict = Depends(auth.current_user),
+):
+    """Update only the fields sent, so quick edits to different fields can't
+    overwrite each other."""
+    _require_item(agent_id, item_id)
+    if not database.get_certificate(item_id, certificate_id):
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    fields = req.model_dump(exclude_none=True)
+    row = database.update_certificate(item_id, certificate_id, fields) if fields else database.get_certificate(item_id, certificate_id)
+    return media.admin_certificate(row)
+
+
+@router.delete("/agents/{agent_id}/items/{item_id}/certificates/{certificate_id}", status_code=204)
+def delete_certificate(
+    agent_id: str, item_id: int, certificate_id: int, user: dict = Depends(auth.current_user)
+):
+    _require_item(agent_id, item_id)
+    row = database.delete_certificate(item_id, certificate_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+    _delete_files([row])

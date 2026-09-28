@@ -31,6 +31,10 @@ UPLOAD_URL_TTL = timedelta(hours=2)
 IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 VIDEO_TYPES = {"video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm"}
 ALLOWED_TYPES = {**IMAGE_TYPES, **VIDEO_TYPES}
+DOCUMENT_TYPES = {"application/pdf": "pdf"}
+CERTIFICATE_TYPES = {**IMAGE_TYPES, **DOCUMENT_TYPES}
+# Everything the bucket accepts.
+BUCKET_TYPES = {**ALLOWED_TYPES, **DOCUMENT_TYPES}
 
 LOCAL_MEDIA_URL_PREFIX = "/media-files"
 
@@ -130,21 +134,31 @@ class SupabaseStorage:
             raise StorageError(f"Couldn't reach Supabase Storage: {exc}") from exc
         return res
 
+    def _bucket_settings(self):
+        return {
+            "public": True,
+            "file_size_limit": MAX_UPLOAD_BYTES,
+            "allowed_mime_types": sorted(BUCKET_TYPES),
+        }
+
     def ensure_ready(self):
-        """Create the public bucket if it doesn't exist yet."""
+        """Create the public bucket if it doesn't exist yet, and widen its
+        allowed file types when new ones are added (e.g. PDF certificates)."""
         res = self._request("GET", f"{self.api}/bucket/{self.bucket}")
         if res.status_code == 200:
+            allowed = set(res.json().get("allowed_mime_types") or [])
+            if allowed and not set(BUCKET_TYPES) <= allowed:
+                upd = self._request(
+                    "PUT", f"{self.api}/bucket/{self.bucket}", json=self._bucket_settings()
+                )
+                if upd.status_code != 200:
+                    raise StorageError(f"Couldn't update bucket ({upd.status_code}): {upd.text[:200]}")
+                logger.info("Updated allowed file types on bucket %s", self.bucket)
             return
         res = self._request(
             "POST",
             f"{self.api}/bucket",
-            json={
-                "id": self.bucket,
-                "name": self.bucket,
-                "public": True,
-                "file_size_limit": MAX_UPLOAD_BYTES,
-                "allowed_mime_types": sorted(ALLOWED_TYPES),
-            },
+            json={"id": self.bucket, "name": self.bucket, **self._bucket_settings()},
         )
         if res.status_code not in (200, 201) and "already exists" not in res.text.lower():
             raise StorageError(f"Couldn't create bucket ({res.status_code}): {res.text[:200]}")

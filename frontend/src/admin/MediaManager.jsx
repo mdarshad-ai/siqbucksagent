@@ -127,7 +127,9 @@ export default function MediaManager({ agentId, itemId, onCountChange }) {
     api(base).then(setItems).catch((err) => setError(err.message));
   }, [base]);
 
-  useEffect(() => onCountChange?.(items.length), [items.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    onCountChange?.(items.length);
+  }, [items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const patchUpload = (key, fields) =>
     setUploads((prev) => prev.map((u) => (u.key === key ? { ...u, ...fields } : u)));
@@ -223,6 +225,16 @@ export default function MediaManager({ agentId, itemId, onCountChange }) {
     saveOrder(next);
   }
 
+  async function setCatalog(item) {
+    setError(null);
+    try {
+      const body = { media_id: item.is_catalog ? null : item.id };
+      setItems(await api(`/agents/${agentId}/items/${itemId}/catalog-image`, { method: "PUT", body }));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   function makeMain(index) {
     const next = [...items];
     const [picked] = next.splice(index, 1);
@@ -316,6 +328,7 @@ export default function MediaManager({ agentId, itemId, onCountChange }) {
               <a className="media-tile-preview" href={assetUrl(m.url)} target="_blank" rel="noreferrer">
                 <MediaThumb item={m} />
                 {i === 0 && <span className="media-tile-main">Main</span>}
+                {m.is_catalog && <span className="media-tile-catalog">Catalogue</span>}
                 <span className="media-tile-kind">{{ image: "Photo", video: "Video", embed: "Link" }[m.kind]}</span>
               </a>
               <input
@@ -338,6 +351,16 @@ export default function MediaManager({ agentId, itemId, onCountChange }) {
                     Make main
                   </button>
                 )}
+                {m.kind === "image" && (
+                  <button
+                    type="button"
+                    className={`btn btn-small ${m.is_catalog ? "btn-selected" : ""}`}
+                    onClick={() => setCatalog(m)}
+                    title="The photo shown for this stone in the catalogue"
+                  >
+                    {m.is_catalog ? "✓ Catalogue photo" : "Use in catalogue"}
+                  </button>
+                )}
                 {m.kind === "video" && (
                   <button type="button" className="btn btn-small" onClick={() => setEditingFrame(m)}>
                     Still frame
@@ -352,6 +375,11 @@ export default function MediaManager({ agentId, itemId, onCountChange }) {
         </div>
       )}
       {items.length > 1 && <p className="admin-hint">Drag tiles (or use the arrows) to change the order customers see.</p>}
+      {items.some((m) => m.kind === "image") && !items.some((m) => m.is_catalog) && (
+        <p className="admin-hint">
+          The catalogue shows the first photo. Tap <em>Use in catalogue</em> on a photo to choose a different one.
+        </p>
+      )}
 
       <form className="admin-row media-link-row" onSubmit={addLink}>
         <input
