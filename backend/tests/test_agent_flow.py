@@ -98,7 +98,7 @@ def test_partner_referral(client, fake_llm):
     refer = next(t for t in request["tools"] if t["function"]["name"] == "refer_to_partner")
     assert refer["function"]["parameters"]["properties"]["partner_id"]["enum"] == ["bucks"]
     system = request["messages"][0]["content"]
-    assert "Bucks (Bucks' Exchange)" in system and "Loupe Gem" in system
+    assert "Bucks (Bucks' Exchange)" in system and "Luxuria Gems" in system
 
 
 def test_referral_to_unknown_partner_is_ignored(client, fake_llm):

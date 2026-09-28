@@ -112,7 +112,7 @@ PREVIOUS_THEMES = {
 }
 
 
-BRAND_NAME = "Loupe Gem"
+BRAND_NAME = "Luxuria Gems"
 
 
 def compose_system_prompt(agent: dict, partners=()) -> str:

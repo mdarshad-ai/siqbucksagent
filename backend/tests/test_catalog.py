@@ -27,7 +27,7 @@ def test_catalog_lists_browsable_stones(client):
     assert data["total"] == 20 and len(data["items"]) == 20
     assert "Sapphire" in data["categories"]
     entry = next(i for i in data["items"] if i["name"] == "Burmese Ruby 1.02ct")
-    assert entry["code"] == f"LGS-{entry['id']:04d}"
+    assert entry["code"] == f"LXS-{entry['id']:04d}"
     assert entry["agent"]["display_name"] == "Siq" and entry["image_url"] is None
     assert "sales_guidance" not in entry and "story" not in entry
 
@@ -149,7 +149,7 @@ def test_stone_page(client, staff):
     assert "sales_guidance" not in page and "SECRET" not in json.dumps(page)
     assert [m["id"] for m in page["media"]] == [chosen["id"], first["id"]]  # catalogue photo leads
     assert page["certificates"][0]["lab"] == "GIA"
-    assert page["agent"]["id"] == "siq" and page["code"].startswith("LGS-")
+    assert page["agent"]["id"] == "siq" and page["code"].startswith("LXS-")
 
     database.update_item("siq", item_id, {"status": "sold"})
     assert client.get(f"/api/stones/{item_id}").status_code == 404

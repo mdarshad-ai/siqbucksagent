@@ -1,6 +1,6 @@
-# Loupe Gem — Your two gem partners
+# Luxuria Gems — Gems crafted to be remembered
 
-*Your two gem partners. Real stones. Just ask.*
+*Discover timeless pieces crafted to celebrate life's most precious moments.*
 
 An agent-led gem shop. Two animated partners — Siq at *Pacific Gems* and
 Bucks at *Bucks' Exchange* — are each backed by an LLM (via OpenRouter)
@@ -11,8 +11,22 @@ and video, and customers can ask the shop to reserve it.
 ```
 backend/     FastAPI + SQLAlchemy (SQLite locally, Supabase Postgres in
              production) + OpenRouter tool-calling
-frontend/    React (Vite): the Loupe Gem site, the chat, and /admin
+frontend/    React (Vite): the Luxuria Gems site, the chat, and /admin
 ```
+
+## Brand
+
+- **Palette** (tokens in `frontend/src/styles/base.css`): Luxuria Gold
+  `#D4AF37`, Champagne `#E8C875`, Antique Gold `#A97828`, Luxury Black
+  `#090806` (page), Espresso Black `#18110C` (cards), Warm Ivory `#F7F0E4`
+  (behind stone photos), Pearl White `#FFFDF8` (text). Gold is an accent,
+  not a text colour; metallic surfaces use the gradient
+  `#9C6B1F → #D4AF37 → #F3DA8A → #C49332` (`--gold-metal`).
+- **Type**: Cormorant Garamond for the wordmark and headings, Manrope for
+  everything else.
+- **Assets** in `frontend/public/brand/`: the logo mark (transparent), the
+  full logo (admin login), favicon and touch icon, the homepage hero photo
+  and the gold-waves texture (closing section and catalogue header).
 
 ## The site
 
@@ -174,7 +188,7 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
 - **Catalogue photo, stock code and certificates** (owners and staff): in a
   stone's edit screen, *Use in catalogue* on a photo picks its catalogue
   image; *Stock code* sets the code shown to customers (automatic if blank,
-  e.g. `LGS-0012`); *Certificates* takes any number of PDFs or images with
+  e.g. `LXS-0012`); *Certificates* takes any number of PDFs or images with
   a lab, title and report number. Partners can mention them, and customers
   can open them from the stone page.
 - **Photos & videos** (owners and staff), in each stone's edit screen:

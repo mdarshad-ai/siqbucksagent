@@ -100,8 +100,8 @@ AGENT_FIELDS = ("id", "display_name", "stall_name", "tagline", "theme")
 
 
 def stone_code(item: dict) -> str:
-    """The shop's stock code, or an automatic one like "LGS-0012"."""
-    return item.get("sku") or f"LG{item['agent_id'][:1].upper()}-{item['id']:04d}"
+    """The shop's stock code, or an automatic one like "LXS-0012"."""
+    return item.get("sku") or f"LX{item['agent_id'][:1].upper()}-{item['id']:04d}"
 
 
 def public_certificate(row: dict) -> dict:

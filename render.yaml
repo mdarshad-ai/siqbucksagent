@@ -15,7 +15,7 @@ services:
       - key: OPENROUTER_MODEL
         value: anthropic/claude-sonnet-4.5
       - key: OPENROUTER_SITE_NAME
-        value: Loupe Gem
+        value: Luxuria Gems
       # Supabase -> Connect -> "Session pooler" connection string.
       - key: DATABASE_URL
         sync: false

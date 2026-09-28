@@ -28,7 +28,7 @@ DEFAULT_HOLD_DAYS = 3
 
 
 def reference(reservation_id: int) -> str:
-    return f"LG-{reservation_id:05d}"
+    return f"LX-{reservation_id:05d}"
 
 
 def _now():
