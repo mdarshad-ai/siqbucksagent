@@ -90,8 +90,9 @@ async function chatErrorFrom(res) {
 }
 
 // Read a server-sent event stream. handlers: onDelta(text), onCard(card),
-// onSuggestions(options), onHandoff(handoff). Resolves with the "done"
-// payload ({reply, cards, suggestions, handoff, history}).
+// onImagePending({id, label, item_name}), onImage({id, image}),
+// onImageFailed({id}), onSuggestions(options), onHandoff(handoff). Resolves
+// with the "done" payload ({reply, cards, images, suggestions, handoff, history}).
 async function readEvents(res, handlers) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -114,6 +115,9 @@ async function readEvents(res, handlers) {
       const payload = data ? JSON.parse(data) : {};
       if (event === "delta") handlers.onDelta?.(payload.text);
       else if (event === "card") handlers.onCard?.(payload.card);
+      else if (event === "image_pending") handlers.onImagePending?.(payload);
+      else if (event === "image") handlers.onImage?.(payload);
+      else if (event === "image_failed") handlers.onImageFailed?.(payload);
       else if (event === "suggestions") handlers.onSuggestions?.(payload.options);
       else if (event === "handoff") handlers.onHandoff?.(payload);
       else if (event === "error") throw new ChatError(payload.message);

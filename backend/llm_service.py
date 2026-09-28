@@ -5,6 +5,8 @@ from pathlib import Path
 from openai import OpenAI
 
 import database
+import gemgenerate
+import limits
 from media import stone_card
 from agent_config import compose_system_prompt
 
@@ -170,11 +172,45 @@ def _run_tool(agent_id: str, tool_name: str, tool_args: dict, shown: list | None
 
 TERMINAL_TOOLS = {"suggest_replies", "refer_to_partner"}
 MAX_SUGGESTIONS = 3
+MAX_IMAGES_PER_REPLY = 2
 
 
-def build_tools(partners: list[dict]):
-    """The fixed tools plus the two whose options depend on the partners."""
-    tools = list(TOOLS) + [
+def _gemgenerate(agent_id, args, context, images):
+    """Run the gemgenerate tool, yielding image_pending then image (or
+    image_failed) events. Returns the tool result for the model."""
+    pending_id = f"img-{len(images) + 1}"
+    if len(images) >= MAX_IMAGES_PER_REPLY:
+        return json.dumps({"error": f"at most {MAX_IMAGES_PER_REPLY} previews per reply"})
+    item = database.get_item(agent_id, args.get("item_id"))
+    setting, metal, style = args.get("setting"), args.get("metal"), args.get("style") or ""
+    try:
+        gemgenerate.check_request(item, setting, metal, style)
+    except gemgenerate.GemGenerateError as exc:
+        return json.dumps({"error": str(exc)})
+    yield {
+        "type": "image_pending",
+        "id": pending_id,
+        "label": gemgenerate.describe(setting, metal, style),
+        "item_name": item["name"],
+    }
+    try:
+        card, _ = gemgenerate.generate(item, setting, metal, style, context=context)
+    except gemgenerate.GemGenerateError as exc:
+        yield {"type": "image_failed", "id": pending_id}
+        return json.dumps({"error": f"{exc}. Tell the customer kindly; don't retry."})
+    images.append(card)
+    yield {"type": "image", "id": pending_id, "image": card}
+    return json.dumps({
+        "ok": True,
+        "shown": card["label"],
+        "note": "The customer can see it now. Remind them it's an AI preview, not the finished piece.",
+    })
+
+
+def build_tools(partners: list[dict], images: bool = False):
+    """The fixed tools plus the two whose options depend on the partners (and
+    gemgenerate when AI previews are on)."""
+    tools = list(TOOLS) + ([gemgenerate.TOOL] if images else []) + [
         {
             "type": "function",
             "function": {
@@ -270,18 +306,23 @@ def _stream_completion(client, **kwargs):
     yield "tool_calls", [calls[i] for i in sorted(calls)]
 
 
-def stream_agent(agent_id: str, message: str, history: list[dict], agent_override=None):
+def stream_agent(agent_id: str, message: str, history: list[dict], agent_override=None, context=None):
     """
     Run one customer turn, yielding events as they happen:
       {"type": "delta", "text"}          reply text, streamed
       {"type": "card", "card"}           a stone card (show_item)
+      {"type": "image_pending", "id", "label", "item_name"}  a preview is being made
+      {"type": "image", "id", "image"}   the finished preview (gemgenerate)
+      {"type": "image_failed", "id"}     the preview couldn't be made
       {"type": "suggestions", "options"} tappable follow-ups
       {"type": "handoff", "to", ...}     offer to continue with the partner
-      {"type": "done", "reply", "cards", "suggestions", "handoff"}
+      {"type": "done", "reply", "cards", "images", "suggestions", "handoff"}
 
     history: plain {"role", "content"} turns from the client.
     agent_override: persona/selling_rules for the admin preview; tools still
     use agent_id's real inventory.
+    context: {"visitor", "ip"} of a public chat. AI previews (gemgenerate)
+    are only offered when it's given, since they're limited per visitor.
     """
     agent = database.get_agent(agent_id)
     if agent and agent_override:
@@ -297,7 +338,8 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
 
     model = os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
     partners = [a for a in database.list_agents() if a["id"] != agent_id]
-    tools = build_tools(partners)
+    images_on = context is not None and bool(limits.get_settings()["image_enabled"])
+    tools = build_tools(partners, images=images_on)
 
     messages = [{"role": "system", "content": compose_system_prompt(agent, partners)}]
     messages.extend({"role": h["role"], "content": h["content"]} for h in history)
@@ -305,6 +347,7 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
 
     client = _get_client()
     cards = []
+    images = []
     state = {"suggestions": [], "handoff": None}
     # Models may talk alongside a tool call and then finish with an empty
     # message, so every piece of text counts toward the reply.
@@ -352,6 +395,8 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
                 if event:
                     yield event
                 result = json.dumps({"ok": bool(event)})
+            elif tc["name"] == "gemgenerate" and images_on:
+                result = yield from _gemgenerate(agent_id, args, context, images)
             else:
                 before = len(cards)
                 result = _run_tool(agent_id, tc["name"], args, shown=cards)
@@ -366,19 +411,21 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
 
     reply = "\n\n".join(segments)
     if not reply:
-        if cards:
+        if images:
+            reply = "Here's a preview - an AI sketch, not the finished piece."
+        elif cards:
             reply = "Have a look at this one below."
         elif state["handoff"]:
             reply = f"{state['handoff']['display_name']} is the one to ask about that."
         else:
             reply = "Sorry, I'm having trouble looking that up right now."
         yield {"type": "delta", "text": reply}
-    yield {"type": "done", "reply": reply, "cards": cards, **state}
+    yield {"type": "done", "reply": reply, "cards": cards, "images": images, **state}
 
 
-def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_override=None):
+def chat_with_agent(agent_id: str, message: str, history: list[dict], agent_override=None, context=None):
     """Non-streaming version of stream_agent: returns its final "done" event."""
-    for event in stream_agent(agent_id, message, history, agent_override=agent_override):
+    for event in stream_agent(agent_id, message, history, agent_override=agent_override, context=context):
         if event["type"] == "done":
             return event
     raise RuntimeError("The chat ended without a reply")

@@ -95,7 +95,7 @@ def chat(req: ChatRequest, request: Request):
         raise HTTPException(status_code=404, detail="Unknown agent")
     limits.check_chat_allowed(request)
     reservations.sweep()  # expire old holds so the dealer sees current stock
-    return run_chat(req.agent_id, req.message, req.history)
+    return run_chat(req.agent_id, req.message, req.history, context=limits.request_context(request))
 
 
 @app.post("/api/chat/stream")
@@ -106,7 +106,7 @@ def chat_stream(req: ChatRequest, request: Request):
     limits.check_chat_allowed(request)
     reservations.sweep()
     return StreamingResponse(
-        stream_chat(req.agent_id, req.message, req.history),
+        stream_chat(req.agent_id, req.message, req.history, context=limits.request_context(request)),
         media_type="text/event-stream",
         # Don't let proxies buffer the stream.
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -164,7 +164,12 @@ def _public_stone(stone_id: int):
 def stone(stone_id: int):
     reservations.sweep()
     item, agent = _public_stone(stone_id)
-    return media.stone_page(item, agent)
+    page = media.stone_page(item, agent)
+    # Show "See it in a ring" only when a preview can actually be made.
+    page["can_preview"] = bool(limits.get_settings()["image_enabled"]) and any(
+        m["kind"] == "image" for m in page["media"]
+    )
+    return page
 
 
 @app.post("/api/stones/{stone_id}/pitch")

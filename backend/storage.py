@@ -96,6 +96,17 @@ class LocalStorage:
     def exists(self, path: str) -> bool:
         return self._file(path).is_file()
 
+    def read(self, path: str) -> bytes:
+        try:
+            return self._file(path).read_bytes()
+        except OSError as exc:
+            raise StorageError(f"Couldn't read {path}") from exc
+
+    def put(self, path: str, data: bytes, content_type: str):
+        target = self._file(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+
     def public_url(self, path: str) -> str:
         return f"{LOCAL_MEDIA_URL_PREFIX}/{quote(path)}"
 
@@ -176,6 +187,22 @@ class SupabaseStorage:
     def exists(self, path: str) -> bool:
         res = self._request("HEAD", self.public_url(path))
         return res.status_code == 200
+
+    def read(self, path: str) -> bytes:
+        res = self._request("GET", self.public_url(path))
+        if res.status_code != 200:
+            raise StorageError(f"Couldn't read {path} ({res.status_code})")
+        return res.content
+
+    def put(self, path: str, data: bytes, content_type: str):
+        res = self._request(
+            "POST",
+            f"{self.api}/object/{self.bucket}/{quote(path)}",
+            content=data,
+            headers={"Content-Type": content_type, "x-upsert": "true"},
+        )
+        if res.status_code not in (200, 201):
+            raise StorageError(f"Couldn't save {path} ({res.status_code}): {res.text[:200]}")
 
     def public_url(self, path: str) -> str:
         return f"{self.api}/object/public/{self.bucket}/{quote(path)}"

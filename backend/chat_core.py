@@ -22,10 +22,11 @@ class ChatMessage(BaseModel):
     # own "system" (or "tool") messages alongside the agent's system prompt.
     role: Literal["user", "assistant"]
     content: str
-    # Display-only extras on an assistant reply: stone cards, tappable
-    # follow-ups, and a handoff offer. Echoed back to the client with the
-    # history, never sent to the model.
+    # Display-only extras on an assistant reply: stone cards, AI previews,
+    # tappable follow-ups, and a handoff offer. Echoed back to the client
+    # with the history, never sent to the model.
     cards: list[dict] | None = None
+    images: list[dict] | None = None
     suggestions: list[str] | None = None
     handoff: dict | None = None
     # The implicit opening question on a stone page: part of the history the
@@ -36,6 +37,7 @@ class ChatMessage(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     cards: list[dict] = []
+    images: list[dict] = []
     suggestions: list[str] = []
     handoff: dict | None = None
     history: list[ChatMessage]
@@ -67,18 +69,20 @@ def _updated_history(history, message, result):
             role="assistant",
             content=result["reply"],
             cards=result["cards"] or None,
+            images=result.get("images") or None,
             suggestions=result["suggestions"] or None,
             handoff=result["handoff"],
         ),
     ]
 
 
-def run_chat(agent_id: str, message: str, history: list[ChatMessage], agent_override=None):
+def run_chat(agent_id: str, message: str, history: list[ChatMessage], agent_override=None, context=None):
     """One whole reply at once (admin preview, and clients without streaming)."""
     _require_key()
     try:
         result = chat_with_agent(
-            agent_id, message, _model_history(history), agent_override=agent_override
+            agent_id, message, _model_history(history), agent_override=agent_override,
+            context=context,
         )
     except Exception:
         # Log the full upstream error server-side; the raw OpenRouter/provider
@@ -89,6 +93,7 @@ def run_chat(agent_id: str, message: str, history: list[ChatMessage], agent_over
     return ChatResponse(
         reply=result["reply"],
         cards=result["cards"],
+        images=result["images"],
         suggestions=result["suggestions"],
         handoff=result["handoff"],
         history=_updated_history(history, message, result),
@@ -99,15 +104,16 @@ def _sse(event: str, data) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-def stream_chat(agent_id: str, message: str, history: list[ChatMessage]):
-    """Server-sent events for one reply: delta / card / suggestions / handoff
-    as they happen, then "done" with the full updated history (or "error")."""
+def stream_chat(agent_id: str, message: str, history: list[ChatMessage], context=None):
+    """Server-sent events for one reply: delta / card / image_pending /
+    image / image_failed / suggestions / handoff as they happen, then "done"
+    with the full updated history (or "error")."""
     _require_key()
     model_history = _model_history(history)
 
     def events():
         try:
-            for event in stream_agent(agent_id, message, model_history):
+            for event in stream_agent(agent_id, message, model_history, context=context):
                 kind = event.pop("type")
                 if kind == "done":
                     event["history"] = [

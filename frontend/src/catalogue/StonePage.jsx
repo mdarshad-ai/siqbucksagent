@@ -3,6 +3,7 @@ import { fetchStone, getRequested, rememberRequested, streamChat, streamPitch } 
 import { friendlyChatError } from "../chatErrors.js";
 import Character from "../components/Character.jsx";
 import { Lightbox, MediaThumb, MediaView } from "../components/MediaViewer.jsx";
+import PreviewCards, { previewHandlers } from "../components/PreviewCard.jsx";
 import ReserveModal from "../components/ReserveModal.jsx";
 import RichText from "../components/RichText.jsx";
 import StoneCard from "../components/StoneCard.jsx";
@@ -71,7 +72,7 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
   const busy = Boolean(live);
 
   function stream(start, before) {
-    const turn = { role: "assistant", content: "", cards: [] };
+    const turn = { role: "assistant", content: "", cards: [], images: [] };
     const update = (fields) => {
       Object.assign(turn, fields);
       setLive({ ...turn });
@@ -80,6 +81,7 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
     return start({
       onDelta: (text) => update({ content: turn.content + text }),
       onCard: (card) => update({ cards: [...turn.cards, card] }),
+      ...previewHandlers(turn, update),
     })
       .then((done) => {
         setHistory(done.history);
@@ -106,7 +108,7 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
   useEffect(() => {
     const el = threadRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [history.length, live?.content, error]);
+  }, [history.length, live?.content, live?.images?.length, error]);
 
   async function send(text) {
     const message = (text ?? input).trim();
@@ -122,6 +124,9 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
   const visible = (live ? [...history, { ...live, streaming: true }] : history).filter((t) => !t.hidden);
   const last = history[history.length - 1];
   const suggestions = !busy && last?.role === "assistant" ? last.suggestions || [] : [];
+  const sketching = live?.images?.some((i) => i.pending);
+  const askedForRing = history.some((t) => t.role === "assistant" && t.images?.some((i) => i.item_id === stone.id));
+  const ringQuestion = `How would the ${stone.name} look set in a ring?`;
 
   return (
     <section
@@ -136,7 +141,13 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
             {agent.display_name} <span>· {agent.stall_name}</span>
           </div>
           <div className="stone-partner-status" aria-live="polite">
-            {busy ? (live?.content ? "Telling you about this stone..." : "Looking at this stone...") : "Your AI partner for this stone"}
+            {busy
+              ? sketching
+                ? "Sketching a preview..."
+                : live?.content
+                  ? "Telling you about this stone..."
+                  : "Looking at this stone..."
+              : "Your AI partner for this stone"}
           </div>
         </div>
       </header>
@@ -159,6 +170,12 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
                   ))}
               </div>
             )}
+            <PreviewCards
+              images={turn.images}
+              partner={agent.display_name}
+              currentStoneId={stone.id}
+              getTranscript={() => history.filter((t) => !t.hidden)}
+            />
             {turn.handoff && (
               <div className="handoff">
                 <span>
@@ -171,7 +188,7 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
             )}
           </div>
         ))}
-        {busy && !live?.content && (
+        {busy && !live?.content && !live?.images?.length && (
           <div className="chat-bubble chat-bubble-assistant chat-bubble-thinking" aria-label="Thinking">
             <span className="dots">
               <span className="dot" />
@@ -182,6 +199,14 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
         )}
         {error && <div className="chat-error">{error}</div>}
       </div>
+
+      {stone.can_preview && !askedForRing && !busy && (
+        <button className="see-in-ring" onClick={() => send(ringQuestion)}>
+          <span className="see-in-ring-icon" aria-hidden="true">✦</span>
+          See it in a ring
+          <span className="see-in-ring-note">AI preview</span>
+        </button>
+      )}
 
       {suggestions.length > 0 && (
         <div className="stone-partner-suggestions">
