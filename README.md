@@ -149,12 +149,24 @@ pytest
   touch *that agent's own* stones; `get_item_details` also returns the
   stone's story and sales guidance, and `show_item` puts a stone card in
   the chat), plus `suggest_replies` (tappable follow-ups) and
-  `refer_to_partner` (hand the customer to the other partner).
+  `refer_to_partner` (hand the customer to the other partner) and
+  `gemgenerate` (an AI preview of a stone set in jewellery, see below).
+- `backend/gemgenerate.py` — **GemGenerate**: when a customer asks "how
+  would it look in a ring?", the partner calls the `gemgenerate` tool with
+  the stone, setting (ring, pendant, earrings, bracelet), metal and style.
+  The server builds a fixed prompt from the stone's details, sends the
+  stone's catalogue photo to a cheap image model on OpenRouter as the
+  reference, saves the picture to storage (`generated/`) and shows it in
+  the chat labelled *AI preview*. The same request (stone photo, setting,
+  metal, style, model) reuses the saved picture for free. New previews
+  have their own limits (default 3 per visitor and 50 for the shop per
+  day). Only public chats get the tool, not stone-page pitches or the
+  admin preview.
 - `backend/main.py` — public endpoints: `GET /api/agents`,
   `GET /api/agents/{id}/inventory` (never includes story or guidance),
   `POST /api/chat` (whole reply) and `POST /api/chat/stream` (the same as
-  server-sent events: `delta`, `card`, `suggestions`, `handoff`, then
-  `done` or `error`), `POST /api/route`, `GET /api/featured`,
+  server-sent events: `delta`, `card`, `image_pending` / `image` /
+  `image_failed`, `suggestions`, `handoff`, then `done` or `error`), `POST /api/route`, `GET /api/featured`,
   `GET /api/catalog`, `GET /api/stones/{id}`, `POST /api/stones/{id}/pitch`
   (the partner's opening pitch as server-sent events) and
   `POST /api/reservations`.
@@ -223,6 +235,14 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
   the whole shop, and how many past messages are sent to the AI with each
   question. Customers who hit a limit get a friendly message in the
   dealer's voice. Counts reset at midnight UTC.
+- **GemGenerate** (owners only, in Settings): switch AI jewellery previews
+  on or off, set their daily limits, and pick the image model (any
+  OpenRouter model with image input and output; the default is
+  `google/gemini-3.1-flash-lite-image`, or `IMAGE_MODEL` if set). *Test an
+  image model* makes a one-off preview of a real stone with any model, not
+  saved or shown to customers, so you can compare quality and cost before
+  switching. Stone pages show a *See it in a ring* button when previews are
+  on and the stone has a photo.
 - **Users** (owners only): add owners or staff. A new user gets a one-time
   temporary password (shown once) and must choose their own at first login.
   Owners can change roles, reset passwords and remove users.

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import Character from "../components/Character.jsx";
+import PreviewCards from "../components/PreviewCard.jsx";
 import RichText from "../components/RichText.jsx";
 import StoneCard from "../components/StoneCard.jsx";
 import { LogoMark } from "../site/Logo.jsx";
 import { partnerCopy } from "../site/partners.js";
 
-function Turn({ turn, history, onHandoff, disabled }) {
+function Turn({ turn, history, partner, onHandoff, disabled }) {
   return (
     <div className={`chat-turn chat-turn-${turn.role}`}>
       {(turn.content || turn.role === "user") && (
@@ -21,6 +22,7 @@ function Turn({ turn, history, onHandoff, disabled }) {
           ))}
         </div>
       )}
+      <PreviewCards images={turn.images} partner={partner} getTranscript={() => history} />
       {turn.handoff && (
         <div className="handoff">
           <span>
@@ -67,7 +69,7 @@ export default function CounterView({
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [history.length, live?.content, live?.cards?.length, agent.id, error]);
+  }, [history.length, live?.content, live?.cards?.length, live?.images?.length, agent.id, error]);
 
   function send(text) {
     const message = (text ?? input).trim();
@@ -82,8 +84,11 @@ export default function CounterView({
   const turns = live ? [...history, live] : history;
   const last = history[history.length - 1];
   const suggestions = !busy && last?.role === "assistant" ? last.suggestions || [] : [];
+  const sketching = live?.images?.some((i) => i.pending);
   const status = busy
-    ? live?.content
+    ? sketching
+      ? `${agent.display_name} is sketching a preview...`
+      : live?.content
       ? `${agent.display_name} is talking...`
       : `${agent.display_name} is checking the stock...`
     : copy.role;
@@ -161,9 +166,16 @@ export default function CounterView({
                 </div>
               )}
               {turns.map((turn, i) => (
-                <Turn key={i} turn={turn} history={history} onHandoff={onHandoff} disabled={busy} />
+                <Turn
+                  key={i}
+                  turn={turn}
+                  history={history}
+                  partner={agent.display_name}
+                  onHandoff={onHandoff}
+                  disabled={busy}
+                />
               ))}
-              {busy && !live?.content && !live?.cards?.length && (
+              {busy && !live?.content && !live?.cards?.length && !live?.images?.length && (
                 <div className="chat-bubble chat-bubble-assistant chat-bubble-thinking" aria-label="Thinking">
                   <span className="dots">
                     <span className="dot" />

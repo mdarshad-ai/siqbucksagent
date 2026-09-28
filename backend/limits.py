@@ -25,6 +25,10 @@ DEFAULT_SETTINGS = {
     "visitor_daily_limit": 100,
     "global_daily_limit": 1500,
     "history_messages": 20,  # only this many past messages go to the model
+    # GemGenerate ("see it in a ring") previews, counted separately.
+    "image_enabled": 1,
+    "image_visitor_daily_limit": 3,
+    "image_global_daily_limit": 50,
 }
 SETTING_BOUNDS = {
     "burst_limit": (1, 1000),
@@ -32,6 +36,9 @@ SETTING_BOUNDS = {
     "visitor_daily_limit": (1, 100000),
     "global_daily_limit": (1, 1000000),
     "history_messages": (2, 100),
+    "image_enabled": (0, 1),
+    "image_visitor_daily_limit": (1, 1000),
+    "image_global_daily_limit": (1, 100000),
 }
 # Shared IPs (offices, mobile carriers) get more room than one visitor.
 IP_MULTIPLIER = 3
@@ -156,6 +163,52 @@ def check_chat_allowed(request: Request):
         database.increment_counter(day, f"v:{visitor}")
 
 
+def request_context(request: Request):
+    """Who is asking, for limits applied deeper in a reply (GemGenerate)."""
+    return {"visitor": visitor_id(request), "ip": client_ip(request)}
+
+
+IMAGE_LIMIT_MESSAGES = {
+    "closed": "The shop has made all its AI previews for today.",
+    "daily": "This customer has had all their AI previews for today.",
+}
+
+
+def check_image_allowed(context: dict | None):
+    """Count one new AI preview for this visitor, or return a reason code
+    ("off", "closed", "daily") if it isn't allowed."""
+    settings = get_settings()
+    if not settings["image_enabled"]:
+        return "off"
+    if context is None:
+        return "off"
+    day = today()
+    if database.get_counter(day, "img") >= settings["image_global_daily_limit"]:
+        return "closed"
+    visitor, ip = context.get("visitor"), context.get("ip") or "unknown"
+    per_visitor = settings["image_visitor_daily_limit"]
+    if visitor and database.get_counter(day, f"img-v:{visitor}") >= per_visitor:
+        return "daily"
+    if database.get_counter(day, f"img-ip:{ip}") >= per_visitor * IP_MULTIPLIER:
+        return "daily"
+    database.increment_counter(day, "img")
+    database.increment_counter(day, f"img-ip:{ip}")
+    if visitor:
+        database.increment_counter(day, f"img-v:{visitor}")
+    return None
+
+
+def refund_image(context: dict | None):
+    """Undo check_image_allowed's count when a preview then fails."""
+    if context is None:
+        return
+    day = today()
+    database.increment_counter(day, "img", -1)
+    database.increment_counter(day, f"img-ip:{context.get('ip') or 'unknown'}", -1)
+    if context.get("visitor"):
+        database.increment_counter(day, f"img-v:{context['visitor']}", -1)
+
+
 def usage_summary():
     settings = get_settings()
     day = today()
@@ -165,6 +218,7 @@ def usage_summary():
         "today": {
             "messages": database.get_counter(day, "global"),
             "visitors": database.count_counters(day, "v:"),
+            "images": database.get_counter(day, "img"),
         },
         "last_7_days": database.counter_history("global", days),
         "settings": settings,

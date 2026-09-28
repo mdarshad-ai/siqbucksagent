@@ -6,14 +6,19 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field, StringConstraints
 
+import logging
+
 import auth
 import database
+import gemgenerate
 import limits
 import media
 import reservations
 import storage
 from agent_config import CORE_RULES
 from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin")
 
@@ -490,6 +495,9 @@ class LimitSettings(BaseModel):
     visitor_daily_limit: int | None = None
     global_daily_limit: int | None = None
     history_messages: int | None = None
+    image_enabled: int | None = None
+    image_visitor_daily_limit: int | None = None
+    image_global_daily_limit: int | None = None
 
 
 @router.get("/usage")
@@ -501,6 +509,64 @@ def usage(user: dict = Depends(auth.require_owner)):
 def update_limits(req: LimitSettings, user: dict = Depends(auth.require_owner)):
     values = {k: v for k, v in req.model_dump().items() if v is not None}
     return limits.update_settings(values, user["email"])
+
+
+# ---------- GemGenerate: AI jewellery previews (owners only) ----------
+
+def _gemgenerate_status():
+    return {
+        "model": gemgenerate.current_model(),
+        "default_model": gemgenerate.DEFAULT_IMAGE_MODEL,
+        "choices": gemgenerate.MODEL_CHOICES,
+        "settings": list(gemgenerate.SETTINGS),
+        "metals": list(gemgenerate.METALS),
+        "styles": list(gemgenerate.STYLES),
+        "saved_previews": database.count_generated(),
+    }
+
+
+@router.get("/gemgenerate")
+def gemgenerate_status(user: dict = Depends(auth.require_owner)):
+    return _gemgenerate_status()
+
+
+class ImageModelUpdate(BaseModel):
+    model: NonEmptyStr = Field(max_length=200)
+
+
+@router.put("/gemgenerate/model")
+def set_image_model(req: ImageModelUpdate, user: dict = Depends(auth.require_owner)):
+    if not gemgenerate.valid_model(req.model):
+        raise HTTPException(status_code=400, detail="Use an OpenRouter model id like provider/model-name")
+    gemgenerate.set_model(req.model, user["email"])
+    return _gemgenerate_status()
+
+
+class ImageTestRequest(BaseModel):
+    agent_id: str
+    item_id: int
+    setting: Literal[tuple(gemgenerate.SETTINGS)]
+    metal: Literal[tuple(gemgenerate.METALS)]
+    style: Literal[("",) + tuple(gemgenerate.STYLES)] = ""
+    model: NonEmptyStr = Field(max_length=200)
+
+
+@router.post("/gemgenerate/test")
+def test_image_model(req: ImageTestRequest, user: dict = Depends(auth.require_owner)):
+    """Try a model on one stone without saving or showing it to customers."""
+    if not gemgenerate.valid_model(req.model):
+        raise HTTPException(status_code=400, detail="Use an OpenRouter model id like provider/model-name")
+    item = _require_item(req.agent_id, req.item_id)
+    try:
+        return gemgenerate.test_preview(item, req.setting, req.metal, req.style, req.model)
+    except gemgenerate.GemGenerateError as exc:
+        raise HTTPException(status_code=400, detail=f"Couldn't make a preview: {exc}")
+    except Exception:
+        logger.exception("GemGenerate test failed for model %s", req.model)
+        raise HTTPException(
+            status_code=502,
+            detail="The image model failed. Check the model id supports image input and output on OpenRouter.",
+        )
 
 
 # ---------- reservation requests (owners and staff) ----------

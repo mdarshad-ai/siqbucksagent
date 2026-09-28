@@ -721,3 +721,37 @@
 .stone-card-link:hover {
   text-decoration: underline;
 }
+
+/* "See it in a ring": ask the partner for a GemGenerate preview. */
+.see-in-ring {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 18px 12px;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.14), rgba(212, 175, 55, 0.04));
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.see-in-ring:hover {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.2);
+}
+
+.see-in-ring-icon {
+  color: var(--gold);
+}
+
+.see-in-ring-note {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    UniqueConstraint,
     and_,
     create_engine,
     delete,
@@ -151,6 +152,24 @@ stone_pitches = Table(
     Column("reply", Text, nullable=False),
     Column("suggestions", Text, nullable=False),  # JSON list
     Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+# GemGenerate previews ("how would it look in a ring?"), saved so the same
+# request is free next time. key covers the photo, setting, metal, style and
+# image model.
+generated_images = Table(
+    "generated_images",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("item_id", Integer, ForeignKey("items.id"), nullable=False, index=True),
+    Column("key", String(64), nullable=False),
+    Column("path", String(500), nullable=False),
+    Column("setting", String(40), nullable=False),
+    Column("metal", String(40), nullable=False),
+    Column("style", String(40), nullable=False, default=""),
+    Column("model", String(200), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("item_id", "key"),
 )
 
 USER_ROLES = ("owner", "staff")
@@ -497,7 +516,9 @@ def delete_item(agent_id: str, item_id: int):
         rows += conn.execute(select(certificates).where(certificates.c.item_id == item_id)).fetchall()
         conn.execute(delete(media).where(media.c.item_id == item_id))
         conn.execute(delete(certificates).where(certificates.c.item_id == item_id))
+        rows += conn.execute(select(generated_images).where(generated_images.c.item_id == item_id)).fetchall()
         conn.execute(delete(stone_pitches).where(stone_pitches.c.item_id == item_id))
+        conn.execute(delete(generated_images).where(generated_images.c.item_id == item_id))
         conn.execute(delete(items).where(items.c.id == item_id))
     return [dict(r._mapping) for r in rows]
 
@@ -814,6 +835,34 @@ def purge_closed_reservations(before):
                 reservations.c.updated_at < before,
             )
         )
+
+
+# ---------- GemGenerate previews ----------
+
+def get_generated(item_id: int, key: str):
+    with get_engine().connect() as conn:
+        row = conn.execute(
+            select(generated_images).where(
+                generated_images.c.item_id == item_id, generated_images.c.key == key
+            )
+        ).first()
+    return dict(row._mapping) if row else None
+
+
+def save_generated(fields: dict):
+    """Save a preview; if the same one was saved meanwhile, keep that one.
+    Returns (row, created)."""
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(insert(generated_images).values(created_at=_now(), **fields))
+    except IntegrityError:
+        return get_generated(fields["item_id"], fields["key"]), False
+    return get_generated(fields["item_id"], fields["key"]), True
+
+
+def count_generated() -> int:
+    with get_engine().connect() as conn:
+        return conn.execute(select(func.count()).select_from(generated_images)).scalar()
 
 
 # ---------- settings ----------

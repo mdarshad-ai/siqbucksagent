@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./adminApi.js";
+import GemGenerateSettings from "./GemGenerateSettings.jsx";
 
 const FIELDS = [
   ["burst_limit", "Messages per visitor in a short burst", "e.g. 15"],
@@ -117,6 +118,8 @@ export default function SettingsTab() {
           {busy ? "Saving..." : "Save limits"}
         </button>
       </form>
+
+      <GemGenerateSettings usage={usage} onSaved={load} />
     </section>
   );
 }

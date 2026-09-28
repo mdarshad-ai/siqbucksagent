@@ -476,3 +476,133 @@
   font-size: 2.2rem;
   color: var(--stall-accent, var(--text));
 }
+
+/* ---------- GemGenerate: AI previews ---------- */
+
+.preview-card {
+  background: var(--panel-raised, #1d1712);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--gold);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.preview-media {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: 0;
+  background: var(--bg-deep);
+  cursor: zoom-in;
+}
+
+.preview-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-badge {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(9, 8, 6, 0.78);
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  color: var(--gold-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.preview-body {
+  padding: 0.6rem 0.75rem 0.75rem;
+}
+
+.preview-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.preview-note {
+  margin-top: 0.2rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.preview-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+}
+
+.preview-actions .stone-card-link,
+.preview-actions .stone-card-requested {
+  margin: 0;
+}
+
+.preview-reserve {
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.preview-reserve:hover {
+  background: rgba(212, 175, 55, 0.15);
+}
+
+.preview-shimmer {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(110deg, transparent 30%, rgba(243, 218, 138, 0.14) 50%, transparent 70%) 0 0 / 250% 100%,
+    radial-gradient(circle at 50% 45%, rgba(212, 175, 55, 0.16), transparent 60%),
+    var(--bg-deep);
+  animation: preview-sweep 1.6s linear infinite;
+}
+
+.preview-shimmer-gem {
+  font-size: 2.4rem;
+  color: var(--gold);
+  animation: preview-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes preview-sweep {
+  from {
+    background-position: 125% 0, 0 0, 0 0;
+  }
+  to {
+    background-position: -125% 0, 0 0, 0 0;
+  }
+}
+
+@keyframes preview-pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-shimmer,
+  .preview-shimmer-gem {
+    animation: none;
+  }
+}

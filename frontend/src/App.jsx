@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAgents, fetchFeatured, routeQuestion, streamChat } from "./api.js";
 import { friendlyChatError } from "./chatErrors.js";
 import { loadHistory, saveHistory } from "./chatStore.js";
+import { previewHandlers } from "./components/PreviewCard.jsx";
 import CataloguePage from "./catalogue/CataloguePage.jsx";
 import StonePage from "./catalogue/StonePage.jsx";
 import CounterView from "./counter/CounterView.jsx";
@@ -81,7 +82,7 @@ export default function App() {
       setErrors((e) => ({ ...e, [agentId]: null }));
       setHistories((prev) => ({ ...prev, [agentId]: [...before, { role: "user", content: message }] }));
 
-      const turn = { role: "assistant", content: "", cards: [], streaming: true };
+      const turn = { role: "assistant", content: "", cards: [], images: [], streaming: true };
       const update = (fields) => {
         Object.assign(turn, fields);
         setLive({ agentId, turn: { ...turn } });
@@ -91,6 +92,7 @@ export default function App() {
         const done = await streamChat(agentId, message, before, {
           onDelta: (text) => update({ content: turn.content + text }),
           onCard: (card) => update({ cards: [...turn.cards, card] }),
+          ...previewHandlers(turn, update),
         });
         setHistory(agentId, done.history);
         return true;

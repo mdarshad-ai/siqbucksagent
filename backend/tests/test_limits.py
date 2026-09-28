@@ -105,7 +105,7 @@ def test_usage_and_settings_permissions(client, owner, staff, fake_llm, set_limi
     chat(client, visitor="visitor-1111")
     chat(client, visitor="visitor-2222")
     usage = client.get("/api/admin/usage", headers=owner).json()
-    assert usage["today"] == {"messages": 2, "visitors": 2}
+    assert usage["today"] == {"messages": 2, "visitors": 2, "images": 0}
     assert usage["last_7_days"][-1]["count"] == 2 and len(usage["last_7_days"]) == 7
     assert usage["settings"]["global_daily_limit"] == 1500
 
