@@ -99,7 +99,7 @@ export default function CounterView({
       <header className="counter-bar">
         <span className="counter-brand">
           <LogoMark size={26} />
-          <span>Loupe Gem</span>
+          <span>Luxuria Gems</span>
         </span>
         <div className="counter-switch" role="tablist" aria-label="Choose an AI partner">
           {agents.map((a) => (

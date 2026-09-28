@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { assetUrl, fetchCatalog } from "../api.js";
 import { Link, navigate } from "../router.jsx";
+import { pageTitle } from "../site/brand.js";
 
 const PAGE_SIZE = 24;
 
@@ -98,9 +99,9 @@ export default function CataloguePage({ agents, search }) {
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    document.title = "Catalogue · Loupe Gem";
+    document.title = pageTitle("Catalogue");
     return () => {
-      document.title = "Loupe Gem · Your two gem partners";
+      document.title = pageTitle();
     };
   }, []);
 

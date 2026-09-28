@@ -30,7 +30,8 @@ function LoginForm({ onLoggedIn }) {
 
   return (
     <form className="admin-card admin-auth" onSubmit={submit}>
-      <h2>Admin login</h2>
+      <img className="admin-auth-logo" src="/brand/logo-full.webp" alt="Luxuria Gems" width="180" height="176" />
+      <h2>Staff login</h2>
       <label>
         Email
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus required />
@@ -197,7 +198,7 @@ export default function AdminApp() {
     <div className="admin-root">
       <header className="admin-header">
         <div>
-          <h1>Loupe Gem</h1>
+          <h1>Luxuria Gems</h1>
           <span className="admin-muted">Admin</span>
         </div>
         <div className="admin-row">

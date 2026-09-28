@@ -47,7 +47,7 @@ try:
 except storage.StorageError:
     logger.exception("Media storage isn't ready - uploads will fail until it is")
 
-app = FastAPI(title="Loupe Gem API")
+app = FastAPI(title="Luxuria Gems API")
 
 origins_env = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
 origins = [o.strip() for o in origins_env.split(",") if o.strip()]
@@ -223,7 +223,7 @@ class ReservationRequest(BaseModel):
 def create_reservation(req: ReservationRequest, request: Request):
     if req.website:
         # Looks like a bot. Pretend it worked, store nothing.
-        return {"reference": "LG-00000"}
+        return {"reference": "LX-00000"}
     if not database.get_agent(req.agent_id):
         raise HTTPException(status_code=404, detail="Unknown agent")
     visitor = limits.visitor_id(request)

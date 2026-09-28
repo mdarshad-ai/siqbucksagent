@@ -1,31 +1,25 @@
-import { useId } from "react";
-
-// Loupe Gem mark: a jeweller's loupe with a faceted stone in the lens.
+// The Luxuria Gems mark (gold ribbons and star, on a transparent background)
+// and the LUXURIA / GEMS wordmark set in Cormorant Garamond.
 export function LogoMark({ size = 32 }) {
-  // The gradient id must be unique per logo on the page (header + footer).
-  const gold = `lg-gold-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" className="logo-mark">
-      <defs>
-        <linearGradient id={gold} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f3dca6" />
-          <stop offset="1" stopColor="#b98d3f" />
-        </linearGradient>
-      </defs>
-      <circle cx="20" cy="20" r="15" fill="none" stroke={`url(#${gold})`} strokeWidth="3.2" />
-      <path d="M31 31 L43 43" stroke={`url(#${gold})`} strokeWidth="5" strokeLinecap="round" />
-      <path d="M13 17 L17 12 H23 L27 17 L20 27 Z" fill="#f3dca6" opacity="0.95" />
-      <path d="M13 17 H27 M17 12 L20 17 L23 12 M20 17 V27" stroke="#8a6a2e" strokeWidth="0.9" fill="none" />
-    </svg>
+    <img
+      className="logo-mark"
+      src="/brand/mark-128.webp"
+      alt=""
+      width={Math.round(size * 0.88)}
+      height={size}
+      decoding="async"
+    />
   );
 }
 
-export default function Logo({ size = 30 }) {
+export default function Logo({ size = 34, stacked = false }) {
   return (
-    <span className="logo">
-      <LogoMark size={size} />
+    <span className={`logo ${stacked ? "logo-stacked" : ""}`}>
+      <LogoMark size={stacked ? size * 2 : size} />
       <span className="logo-word">
-        Loupe <em>Gem</em>
+        <span className="logo-luxuria">Luxuria</span>
+        <span className="logo-gems">Gems</span>
       </span>
     </span>
   );

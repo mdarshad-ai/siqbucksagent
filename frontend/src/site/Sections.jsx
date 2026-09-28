@@ -4,9 +4,9 @@ import Character from "../components/Character.jsx";
 import { Link, navigate } from "../router.jsx";
 import AskBox from "./AskBox.jsx";
 import Logo from "./Logo.jsx";
+import { BRAND, HEADLINE, LEDE } from "./brand.js";
 import { HERO_PROMPTS, partnerCopy } from "./partners.js";
 
-export const TAGLINE = "Your two gem partners. Real stones. Just ask.";
 
 function formatPrice(n) {
   return `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -31,7 +31,7 @@ export function SiteHeader({ onTalk, current }) {
   return (
     <header className={`site-header ${scrolled ? "site-header-scrolled" : ""}`}>
       <div className="site-container site-header-inner">
-        <Link to="/" className="site-brand" aria-label="Loupe Gem, home">
+        <Link to="/" className="site-brand" aria-label="Luxuria Gems, home">
           <Logo />
         </Link>
         <nav className="site-nav" aria-label="Main">
@@ -54,58 +54,45 @@ export function SiteHeader({ onTalk, current }) {
 }
 
 export function Hero({ agents, onAsk, onTalk }) {
-  const [first] = agents;
   return (
     <section className="hero" id="top">
-      <div className="hero-sky" aria-hidden="true">
-        <span className="hero-orb hero-orb-1" />
-        <span className="hero-orb hero-orb-2" />
-        <span className="hero-orb hero-orb-3" />
-      </div>
+      <div className="hero-backdrop" aria-hidden="true" />
       <div className="site-container hero-inner">
         <div className="hero-copy">
-          <p className="eyebrow">An agent-led gem house</p>
+          <p className="eyebrow">{BRAND}</p>
           <h1>
-            Your two gem partners.
+            Gems crafted
             <br />
-            <span className="hero-accent">Real stones.</span> Just ask.
+            to be <em>remembered.</em>
           </h1>
-          <p className="hero-lede">
-            Tell our partners what you're dreaming of. They check the real stock, show you the actual
-            stone in photos and video, and put it aside for you.
-          </p>
+          <p className="hero-lede">{LEDE}</p>
           <AskBox
             onAsk={onAsk}
             prompts={HERO_PROMPTS}
-            placeholder='e.g. "a blue stone under $2,000 for a ring"'
+            placeholder='Ask our AI gem partners, e.g. "a blue stone for a ring"'
           />
-          <Link to="/catalogue" className="hero-browse">
-            Or browse the full catalogue yourself <span aria-hidden="true">→</span>
-          </Link>
-        </div>
-
-        <div className="hero-stage" aria-label="Our partners">
-          {first && (
-            <div className="hero-bubble" style={{ "--stall-accent": first.theme.accent }}>
-              “{partnerCopy(first.id).greeting}”
-              <span className="hero-bubble-name">— {first.display_name}</span>
+          {agents.length > 0 && (
+            <div className="hero-partners" aria-label="Your AI gem partners">
+              <span className="hero-partners-label">Your AI gem partners</span>
+              {agents.map((a) => (
+                <button
+                  key={a.id}
+                  className="hero-partner"
+                  style={{ "--stall-accent": a.theme.accent, "--stall-glow": a.theme.glow }}
+                  onClick={() => onTalk(a.id)}
+                >
+                  <Character theme={a.theme} variant={a.id} talking={false} active />
+                  <span>
+                    <span className="hero-partner-name">{a.display_name}</span>
+                    <span className="hero-partner-stall">{a.stall_name}</span>
+                  </span>
+                </button>
+              ))}
             </div>
           )}
-          <div className="hero-partners">
-            {agents.map((a) => (
-              <button
-                key={a.id}
-                className="hero-partner"
-                style={{ "--stall-accent": a.theme.accent, "--stall-glow": a.theme.glow }}
-                onClick={() => onTalk(a.id)}
-              >
-                <span className="hero-arch" aria-hidden="true" />
-                <Character theme={a.theme} variant={a.id} talking={false} active />
-                <span className="hero-partner-name">{a.display_name}</span>
-                <span className="hero-partner-stall">{a.stall_name}</span>
-              </button>
-            ))}
-          </div>
+          <Link to="/catalogue" className="hero-browse">
+            Or explore the collection yourself <span aria-hidden="true">→</span>
+          </Link>
         </div>
       </div>
     </section>
@@ -254,9 +241,11 @@ export function HowItWorks() {
 export function ClosingCall({ onAsk }) {
   return (
     <section className="section closing">
+      <div className="closing-texture" aria-hidden="true" />
       <div className="site-container closing-inner">
+        <p className="eyebrow">Your AI gem partners</p>
         <h2 className="section-title">What are you looking for?</h2>
-        <p className="hero-lede">Describe it and the right partner will take it from there.</p>
+        <p className="hero-lede">Describe it in your own words, and the right partner will take it from there.</p>
         <AskBox onAsk={onAsk} compact placeholder="Type your question..." />
       </div>
     </section>
@@ -267,12 +256,21 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <div className="site-container site-footer-inner">
-        <div>
-          <Logo size={26} />
-          <p>{TAGLINE}</p>
+        <div className="site-footer-brand">
+          <Logo stacked size={30} />
+          <p>{HEADLINE}</p>
         </div>
+        <nav className="site-footer-links" aria-label="Footer">
+          <Link to="/catalogue">Catalogue</Link>
+          <a href="/#partners" onClick={(e) => goToSection(e, "partners")}>
+            AI gem partners
+          </a>
+          <a href="/#how" onClick={(e) => goToSection(e, "how")}>
+            How it works
+          </a>
+        </nav>
         <div className="site-footer-meta">
-          <span>© {new Date().getFullYear()} Loupe Gem</span>
+          <span>© {new Date().getFullYear()} {BRAND}</span>
           <a href="/admin">Staff login</a>
         </div>
       </div>

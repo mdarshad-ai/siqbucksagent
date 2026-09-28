@@ -38,7 +38,7 @@ def requests_in(client, headers, group):
 def test_request_is_pending_and_does_not_touch_stock(client, staff):
     ruby = item("Burmese Ruby 1.02ct")
     res = request_hold(client, ruby)
-    assert res.status_code == 201 and res.json()["reference"].startswith("LG-")
+    assert res.status_code == 201 and res.json()["reference"].startswith("LX-")
 
     assert database.get_item("siq", ruby["id"])["status"] == "available"
     pending = requests_in(client, staff, "pending")

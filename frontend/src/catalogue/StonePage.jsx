@@ -7,6 +7,7 @@ import ReserveModal from "../components/ReserveModal.jsx";
 import RichText from "../components/RichText.jsx";
 import StoneCard from "../components/StoneCard.jsx";
 import { Link } from "../router.jsx";
+import { pageTitle } from "../site/brand.js";
 import { formatPrice } from "./CataloguePage.jsx";
 
 const SPECS = [
@@ -233,12 +234,12 @@ export default function StonePage({ id, onHandoff }) {
         setStone(s);
         if (s) {
           setRequested(getRequested()[`${s.agent_id}:${s.id}`] || null);
-          document.title = `${s.name} · Loupe Gem`;
+          document.title = pageTitle(s.name);
         }
       })
       .catch((err) => setError(err.message));
     return () => {
-      document.title = "Loupe Gem · Your two gem partners";
+      document.title = pageTitle();
     };
   }, [id]);
 

@@ -1,7 +1,7 @@
 /* Admin pages. Reuses the colour tokens from App.css. */
 
 .admin-root {
-  --accent: #6d8fd6;
+  --accent: #d4af37;
   --danger: #d0604a;
   --ok: #5fae7c;
   --warn: #d6a54a;
@@ -174,9 +174,9 @@
 }
 
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #0b0c14;
+  background: var(--gold-metal);
+  border-color: var(--gold);
+  color: #0c0906;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -409,7 +409,7 @@
 .preview-user {
   align-self: flex-end;
   background: var(--accent);
-  color: #0b0c14;
+  color: #0c0906;
 }
 
 .preview-assistant {
@@ -585,7 +585,7 @@
 .media-tile-main {
   left: 0.4rem;
   background: var(--accent);
-  color: #0b0c14;
+  color: #0c0906;
 }
 
 .media-tile-kind {
@@ -713,7 +713,7 @@
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
   background: var(--warn);
-  color: #0b0c14;
+  color: #0c0906;
   font-size: 0.75rem;
   font-weight: 700;
   text-align: center;
@@ -834,7 +834,7 @@
 }
 
 .featured-star {
-  color: #d9b56c;
+  color: #d4af37;
 }
 
 /* ---------- catalogue photo & certificates ---------- */
@@ -847,13 +847,13 @@
   padding: 0.1rem 0.5rem;
   font-size: 0.72rem;
   font-weight: 700;
-  background: #d9b56c;
-  color: #1a1407;
+  background: #d4af37;
+  color: #140e05;
 }
 
 .btn-selected {
-  border-color: #d9b56c;
-  color: #f3dca6;
+  border-color: #d4af37;
+  color: #e8c875;
 }
 
 .certs-list {
@@ -880,7 +880,7 @@
   height: 36px;
   border-radius: 8px;
   background: rgba(217, 181, 108, 0.15);
-  color: #f3dca6;
+  color: #e8c875;
   font-size: 0.72rem;
   font-weight: 700;
   text-decoration: none;
@@ -895,4 +895,18 @@
   .certs-list li input:nth-of-type(3) {
     grid-column: 1 / -1;
   }
+}
+
+/* ---------- Luxuria login ---------- */
+
+.admin-auth-logo {
+  display: block;
+  width: 180px;
+  height: auto;
+  margin: 0 auto 0.5rem;
+  border-radius: 12px;
+}
+
+.admin-auth h2 {
+  text-align: center;
 }
