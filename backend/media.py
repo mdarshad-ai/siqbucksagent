@@ -92,3 +92,57 @@ def stone_card(item: dict) -> dict:
         **{k: item[k] for k in CARD_FIELDS},
         "media": [public_media(m) for m in database.list_media(item["id"])],
     }
+
+
+# ---------- catalogue & stone pages ----------
+
+AGENT_FIELDS = ("id", "display_name", "stall_name", "tagline", "theme")
+
+
+def stone_code(item: dict) -> str:
+    """The shop's stock code, or an automatic one like "LGS-0012"."""
+    return item.get("sku") or f"LG{item['agent_id'][:1].upper()}-{item['id']:04d}"
+
+
+def public_certificate(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "lab": row["lab"],
+        "number": row["number"],
+        "url": get_storage().public_url(row["path"]),
+        "kind": "pdf" if row["content_type"] == "application/pdf" else "image",
+    }
+
+
+def admin_certificate(row: dict) -> dict:
+    return {**public_certificate(row), "content_type": row["content_type"], "size_bytes": row["size_bytes"]}
+
+
+def catalog_entry(item: dict, image, agent: dict) -> dict:
+    return {
+        "id": item["id"],
+        "code": stone_code(item),
+        "name": item["name"],
+        "category": item["category"],
+        "carat": item["carat"],
+        "price": item["price"],
+        "status": item["status"],
+        "image_url": get_storage().public_url(image["path"]) if image else None,
+        "agent": {k: agent[k] for k in AGENT_FIELDS},
+    }
+
+
+def stone_page(item: dict, agent: dict) -> dict:
+    """Everything the public stone page shows (never the sales guidance)."""
+    media_rows = database.list_media(item["id"])
+    ordered = sorted(media_rows, key=lambda m: m["id"] != item.get("catalog_media_id"))
+    return {
+        **database.public_item(item),
+        "agent_id": item["agent_id"],
+        "code": stone_code(item),
+        "story": item["story"],
+        "media": [public_media(m) for m in ordered],
+        "certificates": [public_certificate(c) for c in database.list_certificates(item["id"])],
+        "agent": {k: agent[k] for k in AGENT_FIELDS},
+    }

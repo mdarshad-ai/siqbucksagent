@@ -21,6 +21,18 @@ frontend/    React (Vite): the Loupe Gem site, the chat, and /admin
   *Meet your AI partners* with sample questions, *On the counter tonight*
   (stones the shop features from /admin), how it works, and a closing ask
   box. A floating *Talk to an AI partner* button follows you down the page.
+- **Catalogue** (`/catalogue`): customers can browse on their own. One
+  photo per stone (the admin's chosen *catalogue photo*, else the first
+  photo), stock code, name, price ("Price on request" when the price is 0)
+  and partner; filter by partner, gem, price and on-hold, sort, search, and
+  load more. Sold-out stones are never listed. Filters live in the URL.
+- **Stone pages** (`/stones/<id>`): gallery (photos, video, YouTube/Vimeo),
+  details, certificates (PDFs/images) and the story, with *Reserve this
+  stone*. The stone's partner appears on the page and immediately pitches
+  it from its story, certificates and sales guidance, then keeps chatting.
+  The opening pitch is written once and saved (`stone_pitches`), so later
+  visitors get it instantly and free; it's rewritten when the stone, its
+  certificates, the partner's persona or the model changes.
 - **The counter**: chatting opens a full-screen counter — the partner stands
   in a lit arch on the left (talking while they reply), the conversation on
   the right; on phones it becomes a compact header above the chat. Replies
@@ -128,7 +140,9 @@ pytest
   `GET /api/agents/{id}/inventory` (never includes story or guidance),
   `POST /api/chat` (whole reply) and `POST /api/chat/stream` (the same as
   server-sent events: `delta`, `card`, `suggestions`, `handoff`, then
-  `done` or `error`), `POST /api/route`, `GET /api/featured` and
+  `done` or `error`), `POST /api/route`, `GET /api/featured`,
+  `GET /api/catalog`, `GET /api/stones/{id}`, `POST /api/stones/{id}/pitch`
+  (the partner's opening pitch as server-sent events) and
   `POST /api/reservations`.
 - `backend/admin_api.py` + `backend/auth.py` — the `/api/admin` endpoints
   and logins behind the admin page.
@@ -157,6 +171,12 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
   - **Sales guidance**: private coaching the dealer follows but never
     quotes. Don't put real secrets here (like a floor price): an AI can
     sometimes be talked into revealing its instructions.
+- **Catalogue photo, stock code and certificates** (owners and staff): in a
+  stone's edit screen, *Use in catalogue* on a photo picks its catalogue
+  image; *Stock code* sets the code shown to customers (automatic if blank,
+  e.g. `LGS-0012`); *Certificates* takes any number of PDFs or images with
+  a lab, title and report number. Partners can mention them, and customers
+  can open them from the stone page.
 - **Photos & videos** (owners and staff), in each stone's edit screen:
   upload photos (JPG/PNG/WebP) and videos (MP4/MOV/WebM, up to 50 MB each),
   or add a YouTube/Vimeo link for longer videos. Set captions, drag to

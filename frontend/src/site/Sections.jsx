@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { assetUrl } from "../api.js";
 import Character from "../components/Character.jsx";
+import { Link, navigate } from "../router.jsx";
 import AskBox from "./AskBox.jsx";
 import Logo from "./Logo.jsx";
 import { HERO_PROMPTS, partnerCopy } from "./partners.js";
@@ -11,7 +12,14 @@ function formatPrice(n) {
   return `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
-export function SiteHeader({ onTalk }) {
+// Home-page sections: scroll there, going back to the home page first if needed.
+function goToSection(e, id) {
+  e.preventDefault();
+  if (window.location.pathname !== "/") navigate("/");
+  requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }));
+}
+
+export function SiteHeader({ onTalk, current }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -23,13 +31,19 @@ export function SiteHeader({ onTalk }) {
   return (
     <header className={`site-header ${scrolled ? "site-header-scrolled" : ""}`}>
       <div className="site-container site-header-inner">
-        <a href="#top" className="site-brand" aria-label="Loupe Gem, home">
+        <Link to="/" className="site-brand" aria-label="Loupe Gem, home">
           <Logo />
-        </a>
-        <nav className="site-nav" aria-label="Sections">
-          <a href="#partners">Partners</a>
-          <a href="#counter">On the counter</a>
-          <a href="#how">How it works</a>
+        </Link>
+        <nav className="site-nav" aria-label="Main">
+          <Link to="/catalogue" className={current === "catalogue" ? "is-current" : ""}>
+            Catalogue
+          </Link>
+          <a href="/#partners" onClick={(e) => goToSection(e, "partners")}>
+            Partners
+          </a>
+          <a href="/#how" onClick={(e) => goToSection(e, "how")}>
+            How it works
+          </a>
         </nav>
         <button className="btn-gold btn-small" onClick={() => onTalk()}>
           Talk to an AI partner
@@ -65,6 +79,9 @@ export function Hero({ agents, onAsk, onTalk }) {
             prompts={HERO_PROMPTS}
             placeholder='e.g. "a blue stone under $2,000 for a ring"'
           />
+          <Link to="/catalogue" className="hero-browse">
+            Or browse the full catalogue yourself <span aria-hidden="true">→</span>
+          </Link>
         </div>
 
         <div className="hero-stage" aria-label="Our partners">
@@ -147,7 +164,7 @@ export function Partners({ agents, onTalk, onAskPartner }) {
   );
 }
 
-export function OnTheCounter({ stones, onAskPartner }) {
+export function OnTheCounter({ stones }) {
   if (!stones.length) return null;
   return (
     <section className="section section-counter" id="counter">
@@ -163,7 +180,7 @@ export function OnTheCounter({ stones, onAskPartner }) {
                 key={`${s.agent.id}-${s.id}`}
                 className="featured-card"
                 style={{ "--stall-accent": s.agent.theme.accent, "--stall-glow": s.agent.theme.glow }}
-                onClick={() => onAskPartner(s.agent.id, `Tell me about the ${s.name}.`)}
+                onClick={() => navigate(`/stones/${s.id}`)}
               >
                 <span className="featured-media">
                   {src ? (
@@ -179,7 +196,7 @@ export function OnTheCounter({ stones, onAskPartner }) {
                     {s.origin ? ` · ${s.origin}` : ""}
                   </span>
                   <span className="featured-ask">
-                    Ask {s.agent.display_name} about it <span aria-hidden="true">→</span>
+                    See it with {s.agent.display_name} <span aria-hidden="true">→</span>
                   </span>
                 </span>
               </button>

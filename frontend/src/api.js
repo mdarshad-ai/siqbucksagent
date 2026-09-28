@@ -89,17 +89,10 @@ async function chatErrorFrom(res) {
   return new ChatError(typeof detail === "string" ? detail : "Chat request failed");
 }
 
-// Stream a reply as server-sent events. handlers: onDelta(text), onCard(card),
-// onSuggestions(options), onHandoff(handoff). Resolves with the final "done"
+// Read a server-sent event stream. handlers: onDelta(text), onCard(card),
+// onSuggestions(options), onHandoff(handoff). Resolves with the "done"
 // payload ({reply, cards, suggestions, handoff, history}).
-export async function streamChat(agentId, message, history, handlers = {}) {
-  const res = await fetch(`${API_URL}/api/chat/stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Visitor-Id": getVisitorId() },
-    body: JSON.stringify({ agent_id: agentId, message, history }),
-  });
-  if (!res.ok) throw await chatErrorFrom(res);
-
+async function readEvents(res, handlers) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -129,6 +122,43 @@ export async function streamChat(agentId, message, history, handlers = {}) {
   }
   if (!done) throw new ChatError("The connection dropped. Please try again.");
   return done;
+}
+
+// Stream a partner's reply to a customer message.
+export async function streamChat(agentId, message, history, handlers = {}) {
+  const res = await fetch(`${API_URL}/api/chat/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Visitor-Id": getVisitorId() },
+    body: JSON.stringify({ agent_id: agentId, message, history }),
+  });
+  if (!res.ok) throw await chatErrorFrom(res);
+  return readEvents(res, handlers);
+}
+
+// Stream the partner's opening pitch for a stone page.
+export async function streamPitch(stoneId, handlers = {}) {
+  const res = await fetch(`${API_URL}/api/stones/${stoneId}/pitch`, {
+    method: "POST",
+    headers: { "X-Visitor-Id": getVisitorId() },
+  });
+  if (!res.ok) throw await chatErrorFrom(res);
+  return readEvents(res, handlers);
+}
+
+export async function fetchCatalog(params) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== "" && v !== null && v !== undefined)
+  );
+  const res = await fetch(`${API_URL}/api/catalog?${query}`);
+  if (!res.ok) throw new Error("Couldn't load the catalogue");
+  return res.json();
+}
+
+export async function fetchStone(id) {
+  const res = await fetch(`${API_URL}/api/stones/${id}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("Couldn't load this stone");
+  return res.json();
 }
 
 export async function routeQuestion(message) {

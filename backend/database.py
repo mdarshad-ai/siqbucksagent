@@ -96,6 +96,11 @@ items = Table(
     Column("sales_guidance", Text, nullable=False, default=""),
     # Shown on the homepage under "On the counter tonight".
     Column("featured", Boolean, nullable=False, default=False),
+    # Shop's own stock code (e.g. "RL1803"); blank means an automatic one.
+    Column("sku", String(40), nullable=False, default=""),
+    # The photo shown for this stone in the catalogue (media.id); if unset,
+    # the first photo is used.
+    Column("catalog_media_id", Integer),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
 )
@@ -118,6 +123,33 @@ media = Table(
     Column("size_bytes", Integer),
     Column("caption", String(300), nullable=False, default=""),
     Column("position", Integer, nullable=False, default=0),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+# Grading reports and certificates for a stone (PDFs or images).
+certificates = Table(
+    "certificates",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("item_id", Integer, ForeignKey("items.id"), nullable=False, index=True),
+    Column("title", String(200), nullable=False, default=""),
+    Column("lab", String(120), nullable=False, default=""),
+    Column("number", String(120), nullable=False, default=""),
+    Column("path", String(500), nullable=False),
+    Column("content_type", String(80), nullable=False),
+    Column("size_bytes", Integer),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+# The partner's opening pitch for a stone page, written once and reused until
+# the stone or the partner changes (fingerprint), so page views are free.
+stone_pitches = Table(
+    "stone_pitches",
+    metadata,
+    Column("item_id", Integer, primary_key=True),
+    Column("fingerprint", String(64), nullable=False),
+    Column("reply", Text, nullable=False),
+    Column("suggestions", Text, nullable=False),  # JSON list
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
@@ -188,10 +220,10 @@ usage_counters = Table(
 ITEM_EDITABLE_FIELDS = (
     "name", "category", "carat", "cut", "color", "clarity", "origin",
     "treatment", "certification", "price", "quantity", "status",
-    "description", "story", "sales_guidance", "featured",
+    "description", "story", "sales_guidance", "featured", "sku",
 )
 ITEM_PUBLIC_FIELDS = (
-    "id", "name", "category", "carat", "cut", "color", "clarity", "origin",
+    "id", "sku", "name", "category", "carat", "cut", "color", "clarity", "origin",
     "treatment", "certification", "price", "quantity", "status", "description",
 )
 AGENT_EDITABLE_FIELDS = ("display_name", "stall_name", "tagline", "persona", "selling_rules")
@@ -243,6 +275,8 @@ def reset_engine():
 # missing tables, so these are added to existing databases on startup.
 ADDED_COLUMNS = [
     ("items", "featured", {"sqlite": "BOOLEAN NOT NULL DEFAULT 0", "default": "BOOLEAN NOT NULL DEFAULT false"}),
+    ("items", "sku", {"default": "VARCHAR(40) NOT NULL DEFAULT ''"}),
+    ("items", "catalog_media_id", {"default": "INTEGER"}),
 ]
 
 
@@ -450,8 +484,9 @@ def update_item(agent_id: str, item_id: int, fields: dict):
 
 
 def delete_item(agent_id: str, item_id: int):
-    """Delete a stone and its media rows. Returns the deleted media rows (so
-    the caller can remove their files), or None if the stone wasn't found."""
+    """Delete a stone with its media, certificates and saved pitch. Returns
+    the deleted media and certificate rows (so the caller can remove their
+    files), or None if the stone wasn't found."""
     with get_engine().begin() as conn:
         exists = conn.execute(
             select(items.c.id).where(items.c.agent_id == agent_id, items.c.id == item_id)
@@ -459,7 +494,10 @@ def delete_item(agent_id: str, item_id: int):
         if not exists:
             return None
         rows = conn.execute(select(media).where(media.c.item_id == item_id)).fetchall()
+        rows += conn.execute(select(certificates).where(certificates.c.item_id == item_id)).fetchall()
         conn.execute(delete(media).where(media.c.item_id == item_id))
+        conn.execute(delete(certificates).where(certificates.c.item_id == item_id))
+        conn.execute(delete(stone_pitches).where(stone_pitches.c.item_id == item_id))
         conn.execute(delete(items).where(items.c.id == item_id))
     return [dict(r._mapping) for r in rows]
 
@@ -533,7 +571,163 @@ def delete_media(item_id: int, media_id: int):
         return None
     with get_engine().begin() as conn:
         conn.execute(delete(media).where(media.c.id == media_id))
+        # If it was the catalogue photo, fall back to the first photo.
+        conn.execute(
+            update(items).where(items.c.id == item_id, items.c.catalog_media_id == media_id)
+            .values(catalog_media_id=None)
+        )
     return row
+
+
+def set_catalog_media(item_id: int, media_id):
+    with get_engine().begin() as conn:
+        conn.execute(update(items).where(items.c.id == item_id).values(catalog_media_id=media_id))
+
+
+# ---------- certificates ----------
+
+def list_certificates(item_id: int):
+    with get_engine().connect() as conn:
+        rows = conn.execute(
+            select(certificates).where(certificates.c.item_id == item_id).order_by(certificates.c.id)
+        ).fetchall()
+    return [dict(r._mapping) for r in rows]
+
+
+def create_certificate(item_id: int, fields: dict):
+    with get_engine().begin() as conn:
+        result = conn.execute(insert(certificates).values(item_id=item_id, created_at=_now(), **fields))
+        cid = result.inserted_primary_key[0]
+    return get_certificate(item_id, cid)
+
+
+def get_certificate(item_id: int, certificate_id: int):
+    with get_engine().connect() as conn:
+        row = conn.execute(
+            select(certificates).where(
+                certificates.c.item_id == item_id, certificates.c.id == certificate_id
+            )
+        ).first()
+    return dict(row._mapping) if row else None
+
+
+def update_certificate(item_id: int, certificate_id: int, fields: dict):
+    with get_engine().begin() as conn:
+        conn.execute(
+            update(certificates)
+            .where(certificates.c.item_id == item_id, certificates.c.id == certificate_id)
+            .values(**fields)
+        )
+    return get_certificate(item_id, certificate_id)
+
+
+def delete_certificate(item_id: int, certificate_id: int):
+    row = get_certificate(item_id, certificate_id)
+    if row:
+        with get_engine().begin() as conn:
+            conn.execute(delete(certificates).where(certificates.c.id == certificate_id))
+    return row
+
+
+# ---------- catalogue ----------
+
+CATALOG_SORTS = {
+    "newest": lambda: [items.c.created_at.desc(), items.c.id.desc()],
+    "price_asc": lambda: [items.c.price.asc(), items.c.id],
+    "price_desc": lambda: [items.c.price.desc(), items.c.id],
+    "carat_desc": lambda: [items.c.carat.desc().nulls_last(), items.c.id],
+}
+
+
+def list_catalog(agent_id=None, category=None, query="", min_price=None, max_price=None,
+                 include_reserved=True, sort="newest", limit=24, offset=0):
+    """Stones customers may browse (never sold-out ones), plus the total."""
+    statuses = ["available", "reserved"] if include_reserved else ["available"]
+    conditions = [items.c.status.in_(statuses), items.c.quantity > 0]
+    if agent_id:
+        conditions.append(items.c.agent_id == agent_id)
+    if category:
+        conditions.append(func.lower(items.c.category) == category.lower())
+    if min_price is not None:
+        conditions.append(items.c.price >= min_price)
+    if max_price is not None:
+        conditions.append(items.c.price <= max_price)
+    terms = _search_terms(query or "")
+    if terms:
+        searchable = (items.c.name, items.c.category, items.c.origin, items.c.color, items.c.sku)
+        conditions.append(and_(*[or_(*[col.ilike(f"%{t}%") for col in searchable]) for t in terms]))
+    with get_engine().connect() as conn:
+        total = conn.execute(select(func.count()).select_from(items).where(*conditions)).scalar()
+        rows = conn.execute(
+            select(items).where(*conditions)
+            .order_by(*CATALOG_SORTS.get(sort, CATALOG_SORTS["newest"])())
+            .limit(limit).offset(offset)
+        ).fetchall()
+        categories = [
+            c for (c,) in conn.execute(
+                select(items.c.category).distinct()
+                .where(items.c.status.in_(statuses), items.c.quantity > 0, items.c.category != "")
+                .order_by(items.c.category)
+            ).fetchall()
+        ]
+    return [dict(r._mapping) for r in rows], total, categories
+
+
+def get_public_item(item_id: int):
+    """A stone by id alone, if customers may see it (not sold out)."""
+    with get_engine().connect() as conn:
+        row = conn.execute(
+            select(items).where(
+                items.c.id == item_id, items.c.status.in_(("available", "reserved")), items.c.quantity > 0
+            )
+        ).first()
+    return dict(row._mapping) if row else None
+
+
+def first_images(item_ids):
+    """{item_id: media row} for each stone's catalogue photo: the chosen one,
+    else its first photo."""
+    if not item_ids:
+        return {}
+    with get_engine().connect() as conn:
+        chosen = dict(
+            conn.execute(select(items.c.id, items.c.catalog_media_id).where(items.c.id.in_(item_ids))).fetchall()
+        )
+        rows = conn.execute(
+            select(media).where(media.c.item_id.in_(item_ids), media.c.kind == "image")
+            .order_by(media.c.position, media.c.id)
+        ).fetchall()
+    result = {}
+    for r in rows:
+        m = dict(r._mapping)
+        if chosen.get(m["item_id"]) == m["id"]:
+            result[m["item_id"]] = m
+        else:
+            result.setdefault(m["item_id"], m)
+    return result
+
+
+# ---------- saved pitches ----------
+
+def get_pitch(item_id: int):
+    with get_engine().connect() as conn:
+        row = conn.execute(select(stone_pitches).where(stone_pitches.c.item_id == item_id)).first()
+    if not row:
+        return None
+    p = dict(row._mapping)
+    p["suggestions"] = json.loads(p["suggestions"])
+    return p
+
+
+def save_pitch(item_id: int, fingerprint: str, reply: str, suggestions):
+    with get_engine().begin() as conn:
+        conn.execute(delete(stone_pitches).where(stone_pitches.c.item_id == item_id))
+        conn.execute(
+            insert(stone_pitches).values(
+                item_id=item_id, fingerprint=fingerprint, reply=reply,
+                suggestions=json.dumps(suggestions or []), created_at=_now(),
+            )
+        )
 
 
 # ---------- reservations ----------

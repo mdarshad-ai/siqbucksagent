@@ -836,3 +836,63 @@
 .featured-star {
   color: #d9b56c;
 }
+
+/* ---------- catalogue photo & certificates ---------- */
+
+.media-tile-catalog {
+  position: absolute;
+  bottom: 0.4rem;
+  left: 0.4rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #d9b56c;
+  color: #1a1407;
+}
+
+.btn-selected {
+  border-color: #d9b56c;
+  color: #f3dca6;
+}
+
+.certs-list {
+  list-style: none;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.certs-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.certs-file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(217, 181, 108, 0.15);
+  color: #f3dca6;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 760px) {
+  .certs-list li {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .certs-list li input:nth-of-type(2),
+  .certs-list li input:nth-of-type(3) {
+    grid-column: 1 / -1;
+  }
+}
