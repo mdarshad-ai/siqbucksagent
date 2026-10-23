@@ -1,4 +1,4 @@
-// Conversations are kept in this browser only, one per partner, so returning
+// The conversation is kept in this browser only, so returning
 // visitors can pick up where they left off.
 const KEY = (agentId) => `loupe-chat-${agentId}`;
 const MAX_MESSAGES = 60;

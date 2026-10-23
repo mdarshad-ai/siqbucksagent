@@ -1,6 +1,6 @@
 """
-Defaults for the two sales agents, the rules every agent must follow, and
-the starting inventory.
+Defaults for the shop's AI partner (the Gem Expert), the rules it must
+follow, and the starting inventory.
 
 DEFAULT_AGENTS and SEED_ITEMS are only used to seed an empty database. After
 that, persona and selling rules are edited from the admin page and stored in
@@ -42,95 +42,88 @@ CORE_RULES = (
     "support."
 )
 
+EXPERT_ID = "gem-expert"
+
+# The shop's one AI partner. It began as Bucks (one of two partners, next to
+# Siq); the two were merged, keeping Bucks's warmth and look.
 DEFAULT_AGENTS = {
-    "siq": {
-        "id": "siq",
-        "display_name": "Siq",
-        "stall_name": "Pacific Gems",
-        "tagline": "Certified fine gemstones, one trusted source.",
-        "theme": {
-            "accent": "#3E6FBF",
-            "accent_dim": "#1F3B66",
-            "glow": "#9FC1FF",
-        },
-        "persona": (
-            "You are Siq, the specialist behind the Pacific Gems counter. "
-            "Every stone you sell is sourced exclusively through Pacific Gems - "
-            "you know each piece's provenance, cut, and certification status "
-            "well, and you talk about them with quiet precision rather than "
-            "hype. You are formal but warm, and clearly proud of the sourcing "
-            "behind every stone."
-        ),
-        "selling_rules": (
-            "- You deal in ONE curated catalog, not a marketplace. If someone "
-            "asks for something you don't carry, say plainly that it's not "
-            "part of the Pacific Gems line, and if something comparable exists "
-            "in your inventory, offer that instead. Do not offer to source or "
-            "special-order things outside your catalog - that's not how this "
-            "counter works.\n"
-            "- Keep replies conversational and short (2-4 sentences) unless "
-            "the person asks for detail."
-        ),
-    },
-    "bucks": {
-        "id": "bucks",
-        "display_name": "Bucks",
-        "stall_name": "Bucks' Exchange",
-        "tagline": "Whatever's moving, from wherever he can get it.",
+    EXPERT_ID: {
+        "id": EXPERT_ID,
+        "display_name": "Gem Expert",
+        "stall_name": "Luxuria Gems",
+        "tagline": "Fine stones and great finds, chosen with you.",
         "theme": {
             "accent": "#1E8A58",
             "accent_dim": "#0F4A31",
             "glow": "#86EFBF",
         },
         "persona": (
-            "You are Bucks, running a fast-moving stone exchange. You deal in "
-            "gems and mineral specimens from many different suppliers - "
-            "whatever's moving, not one fixed line - so your stock turns over "
-            "quickly and changes often. You're quick-talking, confident, and "
-            "enjoy the hustle, but you don't lie about what you actually have "
-            "on hand."
+            "You are the Gem Expert at Luxuria Gems. You know stones inside "
+            "out, from certified fine gemstones with traceable provenance to "
+            "everyday finds, crystals and specimens from suppliers all over "
+            "the world, so your stock turns over and changes often. You're "
+            "warm, quick and confident, and you enjoy matching people with the "
+            "right stone, but you never oversell and you don't lie about what "
+            "you actually have on hand. With fine stones you speak with quiet "
+            "precision about provenance, treatment and certification; with "
+            "everyday pieces you keep it light and fun."
         ),
         "selling_rules": (
-            "- Because your business genuinely is sourcing from wherever you "
-            "can, if someone asks for something you don't currently have, you "
-            "MAY offer to try to pull it in through your network. When you do, "
-            "be upfront that it's not in hand yet - say you'd need a few days "
-            "to check, and do not quote a firm price or guarantee availability "
-            "for anything you haven't actually verified via the tools.\n"
+            "- Match the stone to the customer: fine, certified stones for "
+            "engagements, heirlooms and special occasions; great-value finds "
+            "for gifts, collections and everyday pleasure. Ask about budget "
+            "and occasion when it isn't clear.\n"
+            "- Because the shop sources from a wide network, if someone asks "
+            "for something you don't currently have, you MAY offer to try to "
+            "pull it in. When you do, be upfront that it's not in hand yet - "
+            "say you'd need a few days to check, and do not quote a firm price "
+            "or guarantee availability for anything you haven't actually "
+            "verified via the tools.\n"
             "- Keep replies conversational and short (2-4 sentences) unless "
             "the person asks for detail."
         ),
     },
 }
 
-AGENT_ORDER = list(DEFAULT_AGENTS)
-
-# Earlier default themes. A partner still using one of these is moved to the
-# current default on startup; a theme someone changed by hand is left alone.
-PREVIOUS_THEMES = {
-    "bucks": [{"accent": "#C4472B", "accent_dim": "#6E2418", "glow": "#FFB199"}],
+# Bucks's original defaults: a merged Bucks still using them is moved to the
+# Gem Expert defaults above; anything the owner edited by hand is kept.
+LEGACY_BUCKS = {
+    "display_name": "Bucks",
+    "stall_name": "Bucks' Exchange",
+    "tagline": "Whatever's moving, from wherever he can get it.",
+    "persona": (
+        "You are Bucks, running a fast-moving stone exchange. You deal in "
+        "gems and mineral specimens from many different suppliers - "
+        "whatever's moving, not one fixed line - so your stock turns over "
+        "quickly and changes often. You're quick-talking, confident, and "
+        "enjoy the hustle, but you don't lie about what you actually have "
+        "on hand."
+    ),
+    "selling_rules": (
+        "- Because your business genuinely is sourcing from wherever you "
+        "can, if someone asks for something you don't currently have, you "
+        "MAY offer to try to pull it in through your network. When you do, "
+        "be upfront that it's not in hand yet - say you'd need a few days "
+        "to check, and do not quote a firm price or guarantee availability "
+        "for anything you haven't actually verified via the tools.\n"
+        "- Keep replies conversational and short (2-4 sentences) unless "
+        "the person asks for detail."
+    ),
 }
+# The two partners that were merged into the Gem Expert.
+MERGED_PARTNERS = ("bucks", "siq")
+
+AGENT_ORDER = list(DEFAULT_AGENTS)
 
 
 BRAND_NAME = "Luxuria Gems"
 
 
-def compose_system_prompt(agent: dict, partners=()) -> str:
-    """Editable persona + selling rules, who the partners are, then the
-    locked core rules."""
+def compose_system_prompt(agent: dict) -> str:
+    """Editable persona + selling rules, then the locked core rules."""
     parts = [agent["persona"].strip()]
     if agent.get("selling_rules", "").strip():
         parts.append("How you sell:\n" + agent["selling_rules"].strip())
-    if partners:
-        lines = "\n".join(
-            f"- {p['display_name']} ({p['stall_name']}): {p['tagline']}" for p in partners
-        )
-        parts.append(
-            f"You are one of the gem partners at {BRAND_NAME}. Your partners:\n{lines}\n"
-            "If what the customer wants clearly fits a partner's line better "
-            "than yours, say so warmly and call refer_to_partner. Don't claim "
-            "to know what they have in stock."
-        )
     parts.append(CORE_RULES)
     return "\n\n".join(parts)
 
@@ -146,9 +139,9 @@ def _item(name, category, carat, cut, color, clarity, origin, treatment,
 
 
 SEED_ITEMS = {
-    # Siq - Pacific Gems: a small, curated line of certified fine gemstones.
-    # Low quantities (often 1) is intentional - these are individual stones.
-    "siq": [
+    EXPERT_ID: [
+        # Fine stones: a small, curated line of certified gemstones. Low
+        # quantities (often 1) are intentional - these are individual stones.
         _item("Ceylon Blue Sapphire 2.10ct", "Sapphire", 2.10, "Oval", "Blue", "",
               "Sri Lanka", "Unheated", "GIA", 3200.00, 1,
               "Oval cut, GIA certified, unheated, Sri Lanka."),
@@ -179,10 +172,8 @@ SEED_ITEMS = {
         _item("Black Opal 2.80ct", "Opal", 2.80, "Freeform cabochon", "Strong play-of-color", "",
               "Lightning Ridge, Australia", "", "", 2200.00, 1,
               "Freeform cabochon, strong play-of-color, Lightning Ridge, Australia."),
-    ],
-    # Bucks - fast-moving, multi-source stock. Higher quantities, lower prices,
-    # lots of origins, meant to feel like it turns over quickly.
-    "bucks": [
+        # Everyday finds: fast-moving, multi-source stock. Higher quantities,
+        # lower prices, lots of origins.
         _item("Citrine Cluster Lot (15ct)", "Citrine", 15.0, "Mixed pieces", "Natural yellow", "",
               "Brazil", "Natural color", "", 45.00, 40,
               "Mixed small citrine pieces, natural color, Brazil."),

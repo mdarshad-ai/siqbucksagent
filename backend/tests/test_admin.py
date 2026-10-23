@@ -33,11 +33,12 @@ def login(client, email, password):
 # ---------- seeding ----------
 
 def test_seed_creates_agents_and_inventory_once(client):
-    assert [a["id"] for a in client.get("/api/agents").json()] == ["siq", "bucks"]
-    assert len(database.list_items("siq")) == 10
+    agents = client.get("/api/agents").json()
+    assert [(a["id"], a["display_name"]) for a in agents] == [("gem-expert", "Gem Expert")]
+    assert len(database.list_items("gem-expert")) == 20
     database.init_db()  # a restart must not duplicate or reset anything
-    assert len(database.list_items("siq")) == 10
-    assert len(database.list_agent_versions("siq")) == 1
+    assert len(database.list_items("gem-expert")) == 20
+    assert len(database.list_agent_versions("gem-expert")) == 1
 
 
 def test_public_agents_do_not_expose_personas(client):
@@ -111,7 +112,7 @@ def test_new_user_must_change_temp_password(client, owner):
 
 def test_staff_cannot_manage_agents_or_users(client, staff):
     assert client.get("/api/admin/agents", headers=staff).status_code == 200
-    assert client.get("/api/admin/agents/siq", headers=staff).status_code == 403
+    assert client.get("/api/admin/agents/gem-expert", headers=staff).status_code == 403
     assert client.get("/api/admin/users", headers=staff).status_code == 403
     assert client.post(
         "/api/admin/users", json={"email": "x@example.com"}, headers=staff
@@ -151,59 +152,59 @@ def test_owner_user_management(client, owner, staff):
 # ---------- inventory ----------
 
 def test_staff_can_manage_inventory(client, staff):
-    created = client.post("/api/admin/agents/siq/items", json=STONE, headers=staff)
+    created = client.post("/api/admin/agents/gem-expert/items", json=STONE, headers=staff)
     assert created.status_code == 201
     item = created.json()
     assert item["story"] == STONE["story"] and item["sales_guidance"] == STONE["sales_guidance"]
 
     updated = client.put(
-        f"/api/admin/agents/siq/items/{item['id']}",
+        f"/api/admin/agents/gem-expert/items/{item['id']}",
         json={**STONE, "quantity": 0, "status": "sold"},
         headers=staff,
     ).json()
     assert updated["quantity"] == 0 and updated["status"] == "sold"
 
-    # An item belongs to one agent: Bucks' URL can't touch Siq's stone.
+    # Unknown agents are refused.
     assert client.delete(
-        f"/api/admin/agents/bucks/items/{item['id']}", headers=staff
+        f"/api/admin/agents/nobody/items/{item['id']}", headers=staff
     ).status_code == 404
     assert client.delete(
-        f"/api/admin/agents/siq/items/{item['id']}", headers=staff
+        f"/api/admin/agents/gem-expert/items/{item['id']}", headers=staff
     ).status_code == 204
-    assert database.get_item("siq", item["id"]) is None
+    assert database.get_item("gem-expert", item["id"]) is None
 
 
 @pytest.mark.parametrize(
     "bad", [{"price": -1}, {"quantity": -2}, {"status": "lost"}, {"name": "  "}, {"carat": -0.5}]
 )
 def test_item_validation(client, staff, bad):
-    res = client.post("/api/admin/agents/siq/items", json={**STONE, **bad}, headers=staff)
+    res = client.post("/api/admin/agents/gem-expert/items", json={**STONE, **bad}, headers=staff)
     assert res.status_code == 422
 
 
 def test_public_inventory_hides_private_notes(client, staff):
-    client.post("/api/admin/agents/siq/items", json=STONE, headers=staff)
-    public = client.get("/api/agents/siq/inventory").json()
+    client.post("/api/admin/agents/gem-expert/items", json=STONE, headers=staff)
+    public = client.get("/api/agents/gem-expert/inventory").json()
     stone = next(i for i in public if i["name"] == STONE["name"])
     assert "sales_guidance" not in stone and "story" not in stone
 
 
 def test_agent_tools_read_stone_memory(client, staff, fake_llm):
-    item = client.post("/api/admin/agents/siq/items", json=STONE, headers=staff).json()
+    item = client.post("/api/admin/agents/gem-expert/items", json=STONE, headers=staff).json()
 
-    search = json.loads(llm_service._run_tool("siq", "search_inventory", {"query": "sapphires"}))
+    search = json.loads(llm_service._run_tool("gem-expert", "search_inventory", {"query": "sapphires"}))
     names = [r["name"] for r in search["results"]]
     assert STONE["name"] in names and "Ceylon Blue Sapphire 2.10ct" in names
     assert all("sales_guidance" not in r for r in search["results"])
 
     details = json.loads(
-        llm_service._run_tool("siq", "get_item_details", {"item_id": item["id"]})
+        llm_service._run_tool("gem-expert", "get_item_details", {"item_id": item["id"]})
     )["item"]
     assert details["story"] == STONE["story"]
     assert details["sales_guidance"] == STONE["sales_guidance"]
 
-    # Bucks can't read Siq's stone.
-    other = json.loads(llm_service._run_tool("bucks", "get_item_details", {"item_id": item["id"]}))
+    # Stones that don't exist aren't invented.
+    other = json.loads(llm_service._run_tool("gem-expert", "get_item_details", {"item_id": 99999}))
     assert other == {"error": "not found"}
 
 
@@ -211,10 +212,10 @@ def test_agent_tools_read_stone_memory(client, staff, fake_llm):
 
 def agent_fields(**overrides):
     fields = {
-        "display_name": "Siq",
-        "stall_name": "Pacific Gems",
+        "display_name": "Gem Expert",
+        "stall_name": "Luxuria Gems",
         "tagline": "Certified fine gemstones.",
-        "persona": "You are Siq, cheerful and chatty.",
+        "persona": "You are the Gem Expert, cheerful and chatty.",
         "selling_rules": "- Always mention the certificate.",
     }
     return {**fields, **overrides}
@@ -222,25 +223,25 @@ def agent_fields(**overrides):
 
 def test_publish_persona_creates_version_and_changes_prompt(client, owner, fake_llm):
     res = client.put(
-        "/api/admin/agents/siq", json={**agent_fields(), "note": "More cheerful"}, headers=owner
+        "/api/admin/agents/gem-expert", json={**agent_fields(), "note": "More cheerful"}, headers=owner
     )
     assert res.status_code == 200
     assert res.json()["core_rules"] == CORE_RULES
 
-    versions = client.get("/api/admin/agents/siq/versions", headers=owner).json()
+    versions = client.get("/api/admin/agents/gem-expert/versions", headers=owner).json()
     assert [v["note"] for v in versions] == ["More cheerful", "Initial version"]
     assert versions[0]["created_by"] == OWNER_EMAIL
 
     llm = fake_llm(response(content="Hello!"))
-    client.post("/api/chat", json={"agent_id": "siq", "message": "hi"})
+    client.post("/api/chat", json={"agent_id": "gem-expert", "message": "hi"})
     system = llm.requests[0]["messages"][0]["content"]
-    assert system.startswith("You are Siq, cheerful and chatty.")
+    assert system.startswith("You are the Gem Expert, cheerful and chatty.")
     assert "Always mention the certificate." in system
     assert system.endswith(CORE_RULES)  # locked rules always come last
 
 
 def test_persona_validation(client, owner):
-    res = client.put("/api/admin/agents/siq", json=agent_fields(persona="   "), headers=owner)
+    res = client.put("/api/admin/agents/gem-expert", json=agent_fields(persona="   "), headers=owner)
     assert res.status_code == 422
     assert client.put(
         "/api/admin/agents/nobody", json=agent_fields(), headers=owner
@@ -253,35 +254,14 @@ def test_preview_uses_draft_without_publishing(client, owner, fake_llm):
         response(content="Draft reply"),
     )
     res = client.post(
-        "/api/admin/agents/siq/preview",
-        json={"draft": agent_fields(persona="You are DRAFT Siq."), "message": "Rubies?"},
+        "/api/admin/agents/gem-expert/preview",
+        json={"draft": agent_fields(persona="You are DRAFT Gem Expert."), "message": "Rubies?"},
         headers=owner,
     )
     assert res.json()["reply"] == "Draft reply"
-    assert llm.requests[0]["messages"][0]["content"].startswith("You are DRAFT Siq.")
-    # Tools still use Siq's real inventory.
+    assert llm.requests[0]["messages"][0]["content"].startswith("You are DRAFT Gem Expert.")
+    # Tools still use the real inventory.
     assert "Burmese Ruby" in llm.requests[1]["messages"][-1]["content"]
     # Nothing was published.
-    assert database.get_agent("siq")["persona"].startswith("You are Siq, the specialist")
-    assert len(database.list_agent_versions("siq")) == 1
-
-
-def test_old_default_theme_is_moved_to_the_new_default(client):
-    import json
-
-    from sqlalchemy import update
-
-    from agent_config import DEFAULT_AGENTS, PREVIOUS_THEMES
-
-    old = PREVIOUS_THEMES["bucks"][0]
-    with database.get_engine().begin() as conn:
-        conn.execute(update(database.agents).where(database.agents.c.id == "bucks").values(theme=json.dumps(old)))
-    database.init_db()
-    assert database.get_agent("bucks")["theme"] == DEFAULT_AGENTS["bucks"]["theme"]
-
-    # A theme someone customised is left alone.
-    custom = {"accent": "#123456", "accent_dim": "#000000", "glow": "#abcdef"}
-    with database.get_engine().begin() as conn:
-        conn.execute(update(database.agents).where(database.agents.c.id == "bucks").values(theme=json.dumps(custom)))
-    database.init_db()
-    assert database.get_agent("bucks")["theme"] == custom
+    assert database.get_agent("gem-expert")["persona"].startswith("You are the Gem Expert at Luxuria Gems")
+    assert len(database.list_agent_versions("gem-expert")) == 1

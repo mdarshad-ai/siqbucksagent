@@ -21,7 +21,6 @@ import limits
 import media
 import pitch
 import reservations
-import routing
 import storage
 from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat, stream_chat
 
@@ -111,16 +110,6 @@ def chat_stream(req: ChatRequest, request: Request):
         # Don't let proxies buffer the stream.
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-
-
-class RouteRequest(BaseModel):
-    message: NonEmptyStr = Field(max_length=2000)
-
-
-@app.post("/api/route")
-def route(req: RouteRequest):
-    """Pick which partner should answer an opening question (no AI call)."""
-    return {"agent_id": routing.pick_agent(req.message)}
 
 
 @app.get("/api/catalog")

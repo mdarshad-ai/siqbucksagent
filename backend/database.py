@@ -8,6 +8,7 @@ Uses SQLAlchemy Core so the same code runs on:
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -332,7 +333,7 @@ def init_db():
                         created_at=now, created_by="seed", **row,
                     )
                 )
-        _refresh_default_themes(conn)
+        _merge_partners(conn)
         if conn.execute(select(func.count()).select_from(items)).scalar() == 0:
             now = _now()
             for agent_id, seed_items in agent_config.SEED_ITEMS.items():
@@ -346,12 +347,74 @@ def init_db():
                     )
 
 
-def _refresh_default_themes(conn):
-    for agent_id, old_themes in agent_config.PREVIOUS_THEMES.items():
-        current = agent_config.DEFAULT_AGENTS.get(agent_id, {}).get("theme")
-        stored = conn.execute(select(agents.c.theme).where(agents.c.id == agent_id)).scalar()
-        if current and stored and json.loads(stored) in old_themes:
-            conn.execute(update(agents).where(agents.c.id == agent_id).values(theme=json.dumps(current)))
+def _merged_text(key: str, value: str) -> str:
+    """Bucks's text for the Gem Expert: untouched defaults become the new
+    defaults; anything the owner wrote is kept, with the name swapped."""
+    default = agent_config.DEFAULT_AGENTS[agent_config.EXPERT_ID][key]
+    if key in ("display_name", "stall_name") or value == agent_config.LEGACY_BUCKS.get(key):
+        return default
+
+    def swap(match):
+        name = "the Gem Expert's" if match.group(0).endswith("'") else "the Gem Expert"
+        before = value[:match.start()].rstrip(" ")
+        starts_sentence = not before or before[-1] in ".!?\n-:"
+        return name[0].upper() + name[1:] if starts_sentence else name
+
+    value = re.sub(r"\bBucks'(?!s)|\bBucks\b", swap, value)
+    return value.replace("the the Gem Expert", "the Gem Expert")
+
+
+def _merge_partners(conn):
+    """One-time move from two partners (Siq and Bucks) to the one Gem Expert.
+    Their stones, reservations and persona history all move over, Bucks's
+    persona and look carry on, and stock codes customers have seen stay the
+    same. Does nothing once merged."""
+    expert = agent_config.EXPERT_ID
+    merged = agent_config.MERGED_PARTNERS
+    old = {r.id: dict(r._mapping) for r in conn.execute(select(agents).where(agents.c.id.in_(merged)))}
+    if not old:
+        return
+    now = _now()
+
+    # Automatic stock codes came from the partner's initial (LXS-0012,
+    # LXB-0034); write them down so they don't change.
+    for row in conn.execute(
+        select(items.c.id, items.c.agent_id).where(items.c.agent_id.in_(merged), items.c.sku == "")
+    ).fetchall():
+        conn.execute(
+            update(items).where(items.c.id == row.id)
+            .values(sku=f"LX{row.agent_id[:1].upper()}-{row.id:04d}")
+        )
+
+    base = old.get("bucks") or next(iter(old.values()))
+    fields = {k: _merged_text(k, base[k]) for k in AGENT_EDITABLE_FIELDS}
+    if not conn.execute(select(agents.c.id).where(agents.c.id == expert)).first():
+        theme = agent_config.DEFAULT_AGENTS[expert]["theme"]
+        conn.execute(
+            insert(agents).values(
+                id=expert, theme=json.dumps(theme), updated_at=now, updated_by="merge", **fields
+            )
+        )
+
+    conn.execute(update(items).where(items.c.agent_id.in_(merged)).values(agent_id=expert))
+    conn.execute(update(reservations).where(reservations.c.agent_id.in_(merged)).values(agent_id=expert))
+    # Keep every published persona, so nothing the owner wrote is lost; Siq's
+    # are labelled.
+    for row in conn.execute(
+        select(agent_versions.c.id, agent_versions.c.agent_id, agent_versions.c.note)
+        .where(agent_versions.c.agent_id.in_(merged))
+    ).fetchall():
+        note = row.note if row.agent_id == "bucks" else f"Siq: {row.note}"[:255]
+        conn.execute(
+            update(agent_versions).where(agent_versions.c.id == row.id).values(agent_id=expert, note=note)
+        )
+    conn.execute(
+        insert(agent_versions).values(
+            agent_id=expert, note="Siq and Bucks merged into Gem Expert",
+            created_at=now, created_by="merge", **fields,
+        )
+    )
+    conn.execute(delete(agents).where(agents.c.id.in_(merged)))
 
 
 # ---------- agents ----------

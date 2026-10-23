@@ -2,11 +2,11 @@
 
 *Discover timeless pieces crafted to celebrate life's most precious moments.*
 
-An agent-led gem shop. Two animated partners — Siq at *Pacific Gems* and
-Bucks at *Bucks' Exchange* — are each backed by an LLM (via OpenRouter)
-and their own inventory. Customers shop by conversation: the partners look
-up real stock and prices with tool calls, show the actual stone with photos
-and video, and customers can ask the shop to reserve it.
+An agent-led gem shop. One animated AI partner, the **Gem Expert**, is
+backed by an LLM (via OpenRouter) and the shop's inventory. Customers shop
+by conversation: the Gem Expert looks up real stock and prices with tool
+calls, shows the actual stone with photos and video, and customers can ask
+the shop to reserve it.
 
 ```
 backend/     FastAPI + SQLAlchemy (SQLite locally, Supabase Postgres in
@@ -30,45 +30,52 @@ frontend/    React (Vite): the Luxuria Gems site, the chat, and /admin
 
 ## The site
 
-- **Homepage**: a hero with one "just ask" box (the question is routed to
-  the best-suited partner by a cheap keyword/inventory match, no AI call),
-  *Meet your AI partners* with sample questions, *On the counter tonight*
-  (stones the shop features from /admin), how it works, and a closing ask
-  box. A floating *Talk to an AI partner* button follows you down the page.
+- **Homepage**: a hero with one "just ask" box that opens the chat with the
+  question, *Meet your AI gem expert* with sample questions, *On the
+  counter tonight* (stones the shop features from /admin), how it works,
+  and a closing ask box. A floating *Talk to our Gem Expert* button follows
+  you down the page.
 - **Catalogue** (`/catalogue`): customers can browse on their own. One
   photo per stone (the admin's chosen *catalogue photo*, else the first
-  photo), stock code, name, price ("Price on request" when the price is 0)
-  and partner; filter by partner, gem, price and on-hold, sort, search, and
+  photo), stock code, name and price ("Price on request" when the price is
+  0); filter by gem, price and on-hold, sort, search, and
   load more. Sold-out stones are never listed. Filters live in the URL.
 - **Stone pages** (`/stones/<id>`): gallery (photos, video, YouTube/Vimeo),
   details, certificates (PDFs/images) and the story, with *Reserve this
-  stone*. The stone's partner appears on the page and immediately pitches
+  stone*. The Gem Expert appears on the page and immediately pitches
   it from its story, certificates and sales guidance, then keeps chatting.
   The opening pitch is written once and saved (`stone_pitches`), so later
   visitors get it instantly and free; it's rewritten when the stone, its
-  certificates, the partner's persona or the model changes.
-- **The counter**: chatting opens a full-screen counter — the partner stands
-  in a lit arch on the left (talking while they reply), the conversation on
-  the right; on phones it becomes a compact header above the chat. Replies
-  stream in as they're written, with stone cards, 2–3 tappable follow-up
-  questions, and — when the other partner is a better fit — a one-tap
-  handoff that carries the question over. Conversations are remembered in
-  the visitor's browser ("Welcome back", with *Start fresh*).
+  certificates, the Gem Expert's persona or the model changes.
+- **The counter**: chatting opens a full-screen counter — the Gem Expert
+  stands in a lit arch on the left (talking while it replies), the
+  conversation on the right; on phones it becomes a compact header above
+  the chat. Replies stream in as they're written, with stone cards, AI
+  jewellery previews and 2–3 tappable follow-up questions. Conversations
+  are remembered in the visitor's browser ("Welcome back", with *Start
+  fresh*).
 
-## The two partners
+## The Gem Expert
 
-- **Siq — Pacific Gems**: sells a small, curated line of certified fine
-  gemstones (sapphires, emeralds, rubies, etc.), all sourced through one
-  supplier. If he doesn't carry it, he says so and won't improvise a
-  substitute source.
-- **Bucks — Bucks' Exchange**: sells a higher-turnover, multi-origin stock
-  of gems and mineral specimens. He's allowed to offer to *try* to source
-  something he doesn't currently have, but his system prompt keeps him
-  from quoting a firm price or promising anything he hasn't actually
-  verified in the database.
+One AI partner sells everything: certified fine gemstones (sapphires,
+emeralds, rubies and more) and everyday finds (crystals, cabochons,
+mineral specimens) from a wide network of suppliers. It's warm and quick,
+matches stones to the customer's budget and occasion, and may offer to
+*try* to source something not in stock, without quoting a firm price or
+promising anything it hasn't verified in the database.
 
-Both agents can only state facts (name, price, stock, origin) that come
-back from a tool call against their own inventory table — the system
+The shop used to have two partners, Siq (*Pacific Gems*, fine stones) and
+Bucks (*Bucks' Exchange*, fast-moving stock). They were merged into the
+Gem Expert, which keeps Bucks's personality and green look. On the first
+start with this version, `database.init_db()` moves every stone,
+reservation and published persona of both into the Gem Expert, writes
+down each stone's automatic stock code (e.g. `LXS-0003`) so it doesn't
+change, and replaces Bucks's default persona with the Gem Expert's (a
+persona the owner edited is kept, with "Bucks" renamed). It only runs
+while the old partners exist.
+
+The Gem Expert can only state facts (name, price, stock, origin) that come
+back from a tool call against the inventory table — the system
 prompt tells them never to invent these from memory, so this is enforced
 by instruction, not by a hard technical constraint. Good enough for a demo;
 see the hardening notes at the bottom before treating it as a source of
@@ -134,25 +141,23 @@ pytest
 
 ## 3. How it works
 
-- `backend/agent_config.py` — the locked **core rules** every agent follows
-  (check inventory with tools, never invent prices, keep sales guidance
-  private), plus the default personas and starting inventory used to seed
-  an empty database.
+- `backend/agent_config.py` — the locked **core rules** the Gem Expert
+  follows (check inventory with tools, never invent prices, keep sales
+  guidance private), plus its default persona and the starting inventory
+  used to seed an empty database.
 - `backend/database.py` — SQLAlchemy tables for `agents` (editable persona
   and selling style), `agent_versions` (publish history), `items` (the
   inventory, including each stone's story and private sales guidance) and
   `users` (admin logins). SQLite locally, Postgres (Supabase) in production.
 - `backend/llm_service.py` — the OpenRouter call, using the OpenAI-compatible
   SDK pointed at `https://openrouter.ai/api/v1`. The system prompt is the
-  agent's persona + selling style + core rules. Each agent's own-stock tools are
-  `search_inventory`, `get_item_details` and `show_item` (which only ever
-  touch *that agent's own* stones; `get_item_details` also returns the
-  stone's story and sales guidance, and `show_item` puts a stone card in
-  the chat), plus `suggest_replies` (tappable follow-ups) and
-  `refer_to_partner` (hand the customer to the other partner) and
-  `gemgenerate` (an AI preview of a stone set in jewellery, see below).
+  Gem Expert's persona + selling style + core rules. Its stock tools are
+  `search_inventory`, `get_item_details` (also returns the stone's story
+  and sales guidance) and `show_item` (puts a stone card in the chat),
+  plus `suggest_replies` (tappable follow-ups) and `gemgenerate` (an AI
+  preview of a stone set in jewellery, see below).
 - `backend/gemgenerate.py` — **GemGenerate**: when a customer asks "how
-  would it look in a ring?", the partner calls the `gemgenerate` tool with
+  would it look in a ring?", the Gem Expert calls the `gemgenerate` tool with
   the stone, setting (ring, pendant, earrings, bracelet), metal and style.
   The server builds a fixed prompt from the stone's details, sends the
   stone's catalogue photo to a cheap image model on OpenRouter as the
@@ -166,9 +171,9 @@ pytest
   `GET /api/agents/{id}/inventory` (never includes story or guidance),
   `POST /api/chat` (whole reply) and `POST /api/chat/stream` (the same as
   server-sent events: `delta`, `card`, `image_pending` / `image` /
-  `image_failed`, `suggestions`, `handoff`, then `done` or `error`), `POST /api/route`, `GET /api/featured`,
+  `image_failed`, `suggestions`, then `done` or `error`), `GET /api/featured`,
   `GET /api/catalog`, `GET /api/stones/{id}`, `POST /api/stones/{id}/pitch`
-  (the partner's opening pitch as server-sent events) and
+  (the Gem Expert's opening pitch as server-sent events) and
   `POST /api/reservations`.
 - `backend/admin_api.py` + `backend/auth.py` — the `/api/admin` endpoints
   and logins behind the admin page.
@@ -179,7 +184,7 @@ pytest
 - Conversation history is kept client-side and replayed on every request
   (stateless backend) — simplest thing that works for a demo.
 - `frontend/src/admin/` — the admin page at `/admin`.
-- `frontend/src/components/Character.jsx` — the animated SVG dealer figure.
+- `frontend/src/components/Character.jsx` — the Gem Expert's animated SVG avatar.
 
 ## 4. Admin page: inventory, personas and users
 
@@ -188,13 +193,13 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
 
 - **Inventory** (owners and staff): tick *Feature on the homepage* to put
   a stone *On the counter tonight* (up to 4 available stones are shown).
-  Add, edit and delete each dealer's
+  Add, edit and delete the shop's
   stones — price, stock, status (available / reserved / sold), carat, cut,
   colour, clarity, origin, treatment and certification — plus the stone's
   memory:
-  - **Story**: things the dealer may tell customers (provenance, what makes
+  - **Story**: things the Gem Expert may tell customers (provenance, what makes
     it special, who it suits).
-  - **Sales guidance**: private coaching the dealer follows but never
+  - **Sales guidance**: private coaching the Gem Expert follows but never
     quotes. Don't put real secrets here (like a floor price): an AI can
     sometimes be talked into revealing its instructions.
 - **Catalogue photo, stock code and certificates** (owners and staff): in a
@@ -208,23 +213,23 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
   or add a YouTube/Vimeo link for longer videos. Set captions, drag to
   reorder (the first item is the main image), and pick a video's still
   frame. Files upload straight from the browser to Supabase Storage.
-- **Stone cards in the chat**: when a dealer recommends a stone it calls the
+- **Stone cards in the chat**: when the Gem Expert recommends a stone it calls the
   `show_item` tool, and the customer sees a card under the reply with the
   photos (tap for full screen), videos that play in place, price, stock and
   key details. Sold-out stones never get a card, and there are at most three
   cards per reply.
 - **Reserve this stone**: every stone card in the chat has a *Reserve this
-  stone* button (dealers highlight it when a customer is keen). Customers
+  stone* button (the Gem Expert highlights it when a customer is keen). Customers
   send their name, email, optional phone and note, and can choose to
   include their chat. A request never changes stock by itself.
 - **Requests** (owners and staff): waiting requests show with a count badge.
   *Confirm hold* marks a one-off stone as reserved (or sets one unit aside
-  when there are several) for a number of days, so the dealers tell other
+  when there are several) for a number of days, so the Gem Expert tells other
   customers it's on hold. Holds can be extended, released, or marked sold,
   and expire automatically. Closed requests, with the customer's details,
   are deleted after 90 days. Requests are limited to 3 per visitor per day,
   with a hidden spam trap.
-- **Agents** (owners only): edit each dealer's name, stall, tagline,
+- **Gem Expert** (owners only): edit the Gem Expert's name, stall, tagline,
   persona and selling style. Test a draft in the preview chat (real
   inventory, customers don't see it), then **Publish**. Every publish is
   kept in the history and can be loaded back. The core rules are shown
@@ -234,7 +239,7 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
   limit and a daily limit per visitor (shared IPs get 3x), a daily cap for
   the whole shop, and how many past messages are sent to the AI with each
   question. Customers who hit a limit get a friendly message in the
-  dealer's voice. Counts reset at midnight UTC.
+  Gem Expert's voice. Counts reset at midnight UTC.
 - **GemGenerate** (owners only, in Settings): switch AI jewellery previews
   on or off, set their daily limits, and pick the image model (any
   OpenRouter model with image input and output; the default is

@@ -120,7 +120,7 @@ export default function ReserveModal({ card, getTranscript, onClose, onRequested
             />
             <label className="check">
               <input type="checkbox" checked={form.share_chat} onChange={set("share_chat")} />
-              <span>Include my chat with the dealer, so the shop knows what I'm after.</span>
+              <span>Include my chat with the Gem Expert, so the shop knows what I'm after.</span>
             </label>
             <label className="check">
               <input type="checkbox" checked={form.consent} onChange={set("consent")} required />

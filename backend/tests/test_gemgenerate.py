@@ -17,7 +17,7 @@ VISITOR = {"X-Visitor-Id": "visitor-aaaa-1111"}
 
 
 def ruby():
-    return next(i for i in database.list_items("siq") if i["name"] == "Burmese Ruby 1.02ct")
+    return next(i for i in database.list_items("gem-expert") if i["name"] == "Burmese Ruby 1.02ct")
 
 
 def add_photo(item):
@@ -136,15 +136,15 @@ def test_stone_without_photo(client, fake_llm, image_model):
     assert image_model == []
 
 
-def test_bad_arguments_and_other_partners_stones(client, fake_llm, image_model):
+def test_bad_arguments_and_unknown_stones(client, fake_llm, image_model):
     stone = ruby()
     add_photo(stone)
     llm = fake_llm(*ask_for_ring(stone, metal="copper"))
     stream(client, "Ring?", headers=VISITOR)
     assert "unknown setting" in json.loads(llm.requests[1]["messages"][-1]["content"])["error"]
-    # Bucks can't make previews of Siq's stones.
-    llm = fake_llm(*ask_for_ring(stone))
-    stream(client, "Ring?", agent="bucks", headers=VISITOR)
+    # Stones that don't exist can't be previewed.
+    llm = fake_llm(*ask_for_ring({**stone, "id": 99999}))
+    stream(client, "Ring?", headers=VISITOR)
     assert "not found" in json.loads(llm.requests[1]["messages"][-1]["content"])["error"]
     assert image_model == []
 
@@ -171,7 +171,7 @@ def test_not_offered_in_stone_pitch_or_admin_preview(client, owner, fake_llm):
     stone = ruby()
     llm = fake_llm(response(content="A fine ruby."), response(content="Hello."))
     client.post(f"/api/stones/{stone['id']}/pitch")
-    client.post("/api/admin/agents/siq/preview", json={"message": "Hi", "persona": "x", "selling_rules": "y"}, headers=owner)
+    client.post("/api/admin/agents/gem-expert/preview", json={"message": "Hi", "persona": "x", "selling_rules": "y"}, headers=owner)
     for request in llm.requests:
         assert "gemgenerate" not in [t["function"]["name"] for t in request["tools"]]
 
@@ -182,7 +182,7 @@ def test_deleting_a_stone_removes_its_previews(client, staff, fake_llm, image_mo
     fake_llm(*ask_for_ring(stone))
     card = sse_events(stream(client, "Ring?", headers=VISITOR).text)[-1][1]["images"][0]
     assert client.get(card["url"]).status_code == 200
-    client.delete(f"/api/admin/agents/siq/items/{stone['id']}", headers=staff)
+    client.delete(f"/api/admin/agents/gem-expert/items/{stone['id']}", headers=staff)
     assert client.get(card["url"]).status_code == 404
     assert database.count_generated() == 0
 
@@ -200,7 +200,7 @@ def test_admin_model_choice_and_tester(client, owner, staff, image_model):
     assert res.json()["model"] == "qwen/qwen-image-3" == gemgenerate.current_model()
 
     stone = ruby()
-    body = {"agent_id": "siq", "item_id": stone["id"], "setting": "pendant", "metal": "platinum",
+    body = {"agent_id": "gem-expert", "item_id": stone["id"], "setting": "pendant", "metal": "platinum",
             "model": "google/gemini-3.1-flash-image"}
     no_photo = client.post("/api/admin/gemgenerate/test", json=body, headers=owner)
     assert no_photo.status_code == 400 and "no photo" in no_photo.json()["detail"]

@@ -61,8 +61,8 @@ function Gallery({ media, name }) {
   );
 }
 
-// The stone's partner, pitching it as soon as the page opens, then chatting.
-function PartnerPanel({ stone, onHandoff, onHistory }) {
+// The Gem Expert, pitching the stone as soon as the page opens, then chatting.
+function PartnerPanel({ stone, onHistory }) {
   const agent = stone.agent;
   const [history, setHistory] = useState([]);
   const [live, setLive] = useState(null);
@@ -147,7 +147,7 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
                 : live?.content
                   ? "Telling you about this stone..."
                   : "Looking at this stone..."
-              : "Your AI partner for this stone"}
+              : "Your AI gem expert for this stone"}
           </div>
         </div>
       </header>
@@ -176,16 +176,6 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
               currentStoneId={stone.id}
               getTranscript={() => history.filter((t) => !t.hidden)}
             />
-            {turn.handoff && (
-              <div className="handoff">
-                <span>
-                  {turn.handoff.display_name} at {turn.handoff.stall_name} can help with this.
-                </span>
-                <button onClick={() => onHandoff(turn.handoff)} disabled={busy}>
-                  Continue with {turn.handoff.display_name} <span aria-hidden="true">→</span>
-                </button>
-              </div>
-            )}
           </div>
         ))}
         {busy && !live?.content && !live?.images?.length && (
@@ -226,13 +216,13 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
         }}
       >
         <label className="visually-hidden" htmlFor="stone-question">
-          Ask {agent.display_name} about this stone
+          Ask our {agent.display_name} about this stone
         </label>
         <input
           id="stone-question"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={`Ask ${agent.display_name} about this stone...`}
+          placeholder={`Ask our ${agent.display_name} about this stone...`}
           maxLength={2000}
           autoComplete="off"
         />
@@ -244,7 +234,7 @@ function PartnerPanel({ stone, onHandoff, onHistory }) {
   );
 }
 
-export default function StonePage({ id, onHandoff }) {
+export default function StonePage({ id }) {
   const [stone, setStone] = useState(undefined); // undefined = loading, null = not found
   const [error, setError] = useState(null);
   const [reserving, setReserving] = useState(false);
@@ -326,7 +316,6 @@ export default function StonePage({ id, onHandoff }) {
             <PartnerPanel
               key={stone.id}
               stone={stone}
-              onHandoff={onHandoff}
               onHistory={(h) => (transcript.current = h)}
             />
 

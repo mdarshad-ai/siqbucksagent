@@ -11,7 +11,7 @@ def chat(client, visitor="visitor-aaaa", ip="203.0.113.5", history=None):
         headers["X-Visitor-Id"] = visitor
     return client.post(
         "/api/chat",
-        json={"agent_id": "siq", "message": "hi", "history": history or []},
+        json={"agent_id": "gem-expert", "message": "hi", "history": history or []},
         headers=headers,
     )
 
@@ -122,9 +122,9 @@ def test_admin_preview_is_not_rate_limited(client, owner, fake_llm, set_limits):
     replies(fake_llm, 1)
     chat(client)
     replies(fake_llm, 1)
-    draft = {"display_name": "Siq", "stall_name": "Pacific Gems", "persona": "You are Siq."}
+    draft = {"display_name": "Gem Expert", "stall_name": "Luxuria Gems", "persona": "You are a draft."}
     res = client.post(
-        "/api/admin/agents/siq/preview", json={"draft": draft, "message": "hi"}, headers=owner
+        "/api/admin/agents/gem-expert/preview", json={"draft": draft, "message": "hi"}, headers=owner
     )
     assert res.status_code == 200
 

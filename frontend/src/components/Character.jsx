@@ -1,13 +1,13 @@
 import { useId } from "react";
 
-// An AI partner avatar: a faceted, gem-cut helmet with a glowing visor, a
-// gem core in the chest, circuit traces, and an orbiting ring. While the
-// partner talks, a voice waveform animates and the visor brightens.
+// The AI gem expert's avatar: a faceted, gem-cut helmet with a glowing visor,
+// a gem core in the chest, circuit traces, and an orbiting ring. While it
+// talks, a voice waveform animates and the visor brightens.
 //
-// variant picks the face so partners don't look identical:
+// variant picks the face:
 //   "visor" - one wraparound visor band (default)
-//   "twin"  - two angular eye slits
-const VARIANTS = { siq: "visor", bucks: "twin" };
+//   "twin"  - two friendly eyes and a smile (the Gem Expert, ex-Bucks)
+const VARIANTS = { "gem-expert": "twin" };
 
 export default function Character({ theme, talking, active, variant }) {
   const { accent, accent_dim: dim, glow } = theme;

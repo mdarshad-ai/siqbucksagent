@@ -16,10 +16,10 @@ def sse_events(body: str):
 
 
 def ruby():
-    return next(i for i in database.list_items("siq") if i["name"] == "Burmese Ruby 1.02ct")
+    return next(i for i in database.list_items("gem-expert") if i["name"] == "Burmese Ruby 1.02ct")
 
 
-def stream(client, message="Ruby?", agent="siq", history=None, headers=None):
+def stream(client, message="Ruby?", agent="gem-expert", history=None, headers=None):
     return client.post(
         "/api/chat/stream",
         json={"agent_id": agent, "message": message, "history": history or []},
@@ -77,51 +77,27 @@ def test_suggestions_are_trimmed(client, fake_llm):
     assert done["suggestions"] == ["One", "Two", "Three"]
 
 
-# ---------- partners ----------
+# ---------- one partner ----------
 
-def test_partner_referral(client, fake_llm):
-    llm = fake_llm(
-        response(
-            content="Amethyst is more Bucks's line.",
-            tool_calls=[tool_call("c1", "refer_to_partner", json.dumps(
-                {"partner_id": "bucks", "customer_request": "I'm after amethyst under $30."}))],
-        )
-    )
-    res = client.post("/api/chat", json={"agent_id": "siq", "message": "Cheap amethyst?"}).json()
-    assert res["handoff"] == {
-        "to": "bucks", "display_name": "Bucks", "stall_name": "Bucks' Exchange",
-        "message": "I'm after amethyst under $30.",
-    }
-    assert res["history"][-1]["handoff"]["to"] == "bucks"
-
+def test_one_partner_no_handoffs(client, fake_llm):
+    llm = fake_llm(response(content="Hello!"))
+    res = client.post("/api/chat", json={"agent_id": "gem-expert", "message": "Hi"}).json()
+    assert "handoff" not in res
     request = llm.requests[0]
-    refer = next(t for t in request["tools"] if t["function"]["name"] == "refer_to_partner")
-    assert refer["function"]["parameters"]["properties"]["partner_id"]["enum"] == ["bucks"]
-    system = request["messages"][0]["content"]
-    assert "Bucks (Bucks' Exchange)" in system and "Luxuria Gems" in system
+    assert "refer_to_partner" not in [t["function"]["name"] for t in request["tools"]]
+    assert "partner" not in request["messages"][0]["content"].lower()
+    # The old partner-picking endpoint is gone; there's only one expert.
+    assert client.post("/api/route", json={"message": "hi"}).status_code in (404, 405)
 
 
-def test_referral_to_unknown_partner_is_ignored(client, fake_llm):
-    fake_llm(response(content="Hmm.", tool_calls=[tool_call("c1", "refer_to_partner", json.dumps(
-        {"partner_id": "siq", "customer_request": "x"}))]))
-    res = client.post("/api/chat", json={"agent_id": "siq", "message": "?"}).json()
-    assert res["handoff"] is None
-
-
-# ---------- routing ----------
-
-@pytest.mark.parametrize(
-    "message, agent",
-    [
-        ("A cheap amethyst gift under $30", "bucks"),
-        ("smoky quartz and rose quartz crystals", "bucks"),
-        ("GIA certified sapphire for an engagement ring", "siq"),
-        ("Something rare under $5,000", "siq"),
-        ("hello", "siq"),
-    ],
-)
-def test_route_picks_partner(client, message, agent):
-    assert client.post("/api/route", json={"message": message}).json() == {"agent_id": agent}
+def test_old_histories_with_handoffs_still_work(client, fake_llm):
+    fake_llm(response(content="Sure."))
+    old = [
+        {"role": "user", "content": "Cheap amethyst?"},
+        {"role": "assistant", "content": "Bucks has that.", "handoff": {"to": "bucks", "message": "x"}},
+    ]
+    res = client.post("/api/chat", json={"agent_id": "gem-expert", "message": "Ok", "history": old})
+    assert res.status_code == 200 and "handoff" not in res.json()["history"][1]
 
 
 # ---------- featured ----------
@@ -130,15 +106,15 @@ def test_featured_stones(client, staff):
     stone = ruby()
     assert client.get("/api/featured").json() == []
     body = {k: stone[k] for k in database.ITEM_EDITABLE_FIELDS if k != "featured"}
-    res = client.put(f"/api/admin/agents/siq/items/{stone['id']}", json={**body, "featured": True}, headers=staff)
+    res = client.put(f"/api/admin/agents/gem-expert/items/{stone['id']}", json={**body, "featured": True}, headers=staff)
     assert res.json()["featured"] is True
 
     featured = client.get("/api/featured").json()
     assert [f["name"] for f in featured] == ["Burmese Ruby 1.02ct"]
-    assert featured[0]["agent"]["display_name"] == "Siq" and featured[0]["media"] == []
+    assert featured[0]["agent"]["display_name"] == "Gem Expert" and featured[0]["media"] == []
     assert "sales_guidance" not in featured[0]
 
-    database.update_item("siq", stone["id"], {"status": "sold"})
+    database.update_item("gem-expert", stone["id"], {"status": "sold"})
     assert client.get("/api/featured").json() == []
 
 
@@ -149,4 +125,4 @@ def test_featured_column_is_added_to_existing_databases(client):
     assert "featured" not in {c["name"] for c in inspect(engine).get_columns("items")}
     database.init_db()
     assert "featured" in {c["name"] for c in inspect(engine).get_columns("items")}
-    assert all(i["featured"] is False for i in database.list_items("siq"))
+    assert all(i["featured"] is False for i in database.list_items("gem-expert"))

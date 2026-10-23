@@ -12,14 +12,14 @@ JPEG = b"\xff\xd8\xff\xe0" + b"fake-jpeg" * 10
 MP4 = b"\x00\x00\x00\x18ftypmp42" + b"fake-video" * 10
 
 
-def siq_item_id(name="Burmese Ruby 1.02ct"):
-    return next(i["id"] for i in database.list_items("siq") if i["name"] == name)
+def stone_id(name="Burmese Ruby 1.02ct"):
+    return next(i["id"] for i in database.list_items("gem-expert") if i["name"] == name)
 
 
 def upload(client, headers, item_id, data, content_type, purpose="media"):
     """Do the browser's two steps: get an upload URL, then PUT the bytes."""
     res = client.post(
-        f"/api/admin/agents/siq/items/{item_id}/media/upload-url",
+        f"/api/admin/agents/gem-expert/items/{item_id}/media/upload-url",
         json={"content_type": content_type, "size_bytes": len(data), "purpose": purpose},
         headers=headers,
     )
@@ -33,7 +33,7 @@ def upload(client, headers, item_id, data, content_type, purpose="media"):
 def add_photo(client, headers, item_id, caption=""):
     path = upload(client, headers, item_id, JPEG, "image/jpeg")
     res = client.post(
-        f"/api/admin/agents/siq/items/{item_id}/media",
+        f"/api/admin/agents/gem-expert/items/{item_id}/media",
         json={"path": path, "content_type": "image/jpeg", "size_bytes": len(JPEG), "caption": caption},
         headers=headers,
     )
@@ -45,7 +45,7 @@ def add_video(client, headers, item_id):
     path = upload(client, headers, item_id, MP4, "video/mp4")
     poster = upload(client, headers, item_id, JPEG, "image/jpeg", purpose="poster")
     res = client.post(
-        f"/api/admin/agents/siq/items/{item_id}/media",
+        f"/api/admin/agents/gem-expert/items/{item_id}/media",
         json={"path": path, "poster_path": poster, "content_type": "video/mp4", "size_bytes": len(MP4)},
         headers=headers,
     )
@@ -56,19 +56,19 @@ def add_video(client, headers, item_id):
 # ---------- uploads ----------
 
 def test_photo_upload_is_stored_and_served(client, staff):
-    item_id = siq_item_id()
+    item_id = stone_id()
     photo = add_photo(client, staff, item_id, caption="Daylight")
     assert photo["kind"] == "image" and photo["caption"] == "Daylight"
     assert client.get(photo["url"]).content == JPEG
 
-    listed = client.get(f"/api/admin/agents/siq/items/{item_id}/media", headers=staff).json()
+    listed = client.get(f"/api/admin/agents/gem-expert/items/{item_id}/media", headers=staff).json()
     assert [m["id"] for m in listed] == [photo["id"]]
-    counts = {i["id"]: i["media_count"] for i in client.get("/api/admin/agents/siq/items", headers=staff).json()}
+    counts = {i["id"]: i["media_count"] for i in client.get("/api/admin/agents/gem-expert/items", headers=staff).json()}
     assert counts[item_id] == 1
 
 
 def test_video_upload_with_still_frame(client, staff):
-    video = add_video(client, staff, siq_item_id())
+    video = add_video(client, staff, stone_id())
     assert video["kind"] == "video"
     assert client.get(video["url"]).content == MP4
     assert client.get(video["poster_url"]).content == JPEG
@@ -84,14 +84,14 @@ def test_video_upload_with_still_frame(client, staff):
 )
 def test_upload_url_rejects_bad_files(client, staff, body, message):
     res = client.post(
-        f"/api/admin/agents/siq/items/{siq_item_id()}/media/upload-url", json=body, headers=staff
+        f"/api/admin/agents/gem-expert/items/{stone_id()}/media/upload-url", json=body, headers=staff
     )
     assert res.status_code == 400 and message in res.json()["detail"]
 
 
 def test_upload_needs_login_and_valid_token(client):
     res = client.post(
-        f"/api/admin/agents/siq/items/{siq_item_id()}/media/upload-url",
+        f"/api/admin/agents/gem-expert/items/{stone_id()}/media/upload-url",
         json={"content_type": "image/jpeg", "size_bytes": 10},
     )
     assert res.status_code == 401
@@ -99,23 +99,23 @@ def test_upload_needs_login_and_valid_token(client):
 
 
 def test_media_must_be_uploaded_for_that_stone(client, staff):
-    ruby, emerald = siq_item_id(), siq_item_id("Colombian Emerald 1.45ct")
+    ruby, emerald = stone_id(), stone_id("Colombian Emerald 1.45ct")
     ruby_path = upload(client, staff, ruby, JPEG, "image/jpeg")
     body = {"content_type": "image/jpeg", "size_bytes": len(JPEG)}
 
     # Another stone's file
     res = client.post(
-        f"/api/admin/agents/siq/items/{emerald}/media", json={**body, "path": ruby_path}, headers=staff
+        f"/api/admin/agents/gem-expert/items/{emerald}/media", json={**body, "path": ruby_path}, headers=staff
     )
     assert res.status_code == 400
     # A path that was never uploaded
     res = client.post(
-        f"/api/admin/agents/siq/items/{ruby}/media",
+        f"/api/admin/agents/gem-expert/items/{ruby}/media",
         json={**body, "path": f"items/{ruby}/missing.jpg"}, headers=staff,
     )
     assert res.status_code == 400
-    # Stones are per agent: Bucks' URL can't reach Siq's stone.
-    res = client.get(f"/api/admin/agents/bucks/items/{ruby}/media", headers=staff)
+    # Unknown agents are refused.
+    res = client.get(f"/api/admin/agents/nobody/items/{ruby}/media", headers=staff)
     assert res.status_code == 404
 
 
@@ -144,9 +144,9 @@ def test_rejects_other_links(url):
 
 
 def test_add_video_link(client, staff):
-    item_id = siq_item_id()
+    item_id = stone_id()
     res = client.post(
-        f"/api/admin/agents/siq/items/{item_id}/media/link",
+        f"/api/admin/agents/gem-expert/items/{item_id}/media/link",
         json={"url": "https://youtu.be/dQw4w9WgXcQ", "caption": "Under a loupe"},
         headers=staff,
     )
@@ -154,7 +154,7 @@ def test_add_video_link(client, staff):
     assert res.json()["kind"] == "embed"
     assert res.json()["poster_url"].startswith("https://i.ytimg.com/")
     bad = client.post(
-        f"/api/admin/agents/siq/items/{item_id}/media/link",
+        f"/api/admin/agents/gem-expert/items/{item_id}/media/link",
         json={"url": "https://example.com/x"}, headers=staff,
     )
     assert bad.status_code == 400
@@ -163,10 +163,10 @@ def test_add_video_link(client, staff):
 # ---------- editing ----------
 
 def test_reorder_caption_and_replace_still_frame(client, staff):
-    item_id = siq_item_id()
+    item_id = stone_id()
     photo = add_photo(client, staff, item_id)
     video = add_video(client, staff, item_id)
-    base = f"/api/admin/agents/siq/items/{item_id}/media"
+    base = f"/api/admin/agents/gem-expert/items/{item_id}/media"
 
     ordered = client.put(f"{base}/order", json={"ids": [video["id"], photo["id"]]}, headers=staff)
     assert [m["id"] for m in ordered.json()] == [video["id"], photo["id"]]
@@ -185,10 +185,10 @@ def test_reorder_caption_and_replace_still_frame(client, staff):
 
 
 def test_deleting_media_and_stones_removes_files(client, staff):
-    item_id = siq_item_id()
+    item_id = stone_id()
     photo = add_photo(client, staff, item_id)
     video = add_video(client, staff, item_id)
-    base = f"/api/admin/agents/siq/items/{item_id}"
+    base = f"/api/admin/agents/gem-expert/items/{item_id}"
 
     assert client.delete(f"{base}/media/{photo['id']}", headers=staff).status_code == 204
     assert client.get(photo["url"]).status_code == 404
@@ -202,14 +202,14 @@ def test_deleting_media_and_stones_removes_files(client, staff):
 # ---------- stone cards in chat ----------
 
 def test_show_item_adds_cards_to_the_reply(client, staff, fake_llm):
-    item_id = siq_item_id()
+    item_id = stone_id()
     photo = add_photo(client, staff, item_id, caption="Daylight")
     llm = fake_llm(
         response(tool_calls=[tool_call("c1", "show_item", json.dumps({"item_id": item_id}))]),
         response(content="Have a look at this ruby."),
     )
 
-    res = client.post("/api/chat", json={"agent_id": "siq", "message": "Show me a ruby"}).json()
+    res = client.post("/api/chat", json={"agent_id": "gem-expert", "message": "Show me a ruby"}).json()
 
     card = res["cards"][0]
     assert card["name"] == "Burmese Ruby 1.02ct" and card["price"] == 4100
@@ -222,31 +222,30 @@ def test_show_item_adds_cards_to_the_reply(client, staff, fake_llm):
     # Cards are display-only: the next turn doesn't send them to the model.
     llm = fake_llm(response(content="It's unheated."))
     client.post(
-        "/api/chat", json={"agent_id": "siq", "message": "Heated?", "history": res["history"]}
+        "/api/chat", json={"agent_id": "gem-expert", "message": "Heated?", "history": res["history"]}
     )
     assert all("cards" not in m for m in llm.requests[0]["messages"])
 
 
 def test_show_item_rules(client, staff):
     shown = []
-    sold = siq_item_id("Alexandrite 0.62ct")
-    database.update_item("siq", sold, {"status": "sold"})
+    sold = stone_id("Alexandrite 0.62ct")
+    database.update_item("gem-expert", sold, {"status": "sold"})
 
-    result = json.loads(llm_service._run_tool("siq", "show_item", {"item_id": sold}, shown))
+    result = json.loads(llm_service._run_tool("gem-expert", "show_item", {"item_id": sold}, shown))
     assert "sold out" in result["error"] and shown == []
 
-    bucks_item = database.list_items("bucks")[0]["id"]
-    assert json.loads(llm_service._run_tool("siq", "show_item", {"item_id": bucks_item}, shown)) == {
+    assert json.loads(llm_service._run_tool("gem-expert", "show_item", {"item_id": 99999}, shown)) == {
         "error": "not found"
     }
 
-    ids = [i["id"] for i in database.list_items("siq") if i["id"] != sold][:4]
+    ids = [i["id"] for i in database.list_items("gem-expert") if i["id"] != sold][:4]
     for item_id in ids[:3]:
-        assert json.loads(llm_service._run_tool("siq", "show_item", {"item_id": item_id}, shown))["ok"]
+        assert json.loads(llm_service._run_tool("gem-expert", "show_item", {"item_id": item_id}, shown))["ok"]
     # Showing the same stone twice doesn't duplicate it; a 4th is refused.
-    assert json.loads(llm_service._run_tool("siq", "show_item", {"item_id": ids[0]}, shown))["ok"]
+    assert json.loads(llm_service._run_tool("gem-expert", "show_item", {"item_id": ids[0]}, shown))["ok"]
     assert "at most" in json.loads(
-        llm_service._run_tool("siq", "show_item", {"item_id": ids[3]}, shown)
+        llm_service._run_tool("gem-expert", "show_item", {"item_id": ids[3]}, shown)
     )["error"]
     assert [c["id"] for c in shown] == ids[:3]
 

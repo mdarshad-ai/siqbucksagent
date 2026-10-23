@@ -165,9 +165,9 @@ function StoneForm({ agentId, item, onSaved, onCancel, onDeleted, onMediaCount }
         </fieldset>
 
         <fieldset>
-          <legend>Stone memory (what the dealer knows)</legend>
+          <legend>Stone memory (what the Gem Expert knows)</legend>
           <label>
-            Story <span className="admin-muted">— the dealer may tell customers this</span>
+            Story <span className="admin-muted">— the Gem Expert may tell customers this</span>
             <textarea
               rows={4}
               value={form.story}
@@ -286,17 +286,20 @@ export default function InventoryTab() {
     <section>
       <div className="admin-row admin-row-between admin-toolbar">
         <div className="admin-row">
-          <div className="segmented">
-            {agents.map((a) => (
-              <button
-                key={a.id}
-                className={agentId === a.id ? "segmented-active" : ""}
-                onClick={() => setAgentId(a.id)}
-              >
-                {a.display_name} <span className="admin-muted">· {a.stall_name}</span>
-              </button>
-            ))}
-          </div>
+          {/* One inventory now; the picker only shows if more agents return. */}
+          {agents.length > 1 && (
+            <div className="segmented">
+              {agents.map((a) => (
+                <button
+                  key={a.id}
+                  className={agentId === a.id ? "segmented-active" : ""}
+                  onClick={() => setAgentId(a.id)}
+                >
+                  {a.display_name} <span className="admin-muted">· {a.stall_name}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <input
             className="admin-search"
             placeholder="Filter stones..."

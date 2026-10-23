@@ -22,7 +22,6 @@ function readFilters(search) {
   const q = new URLSearchParams(search);
   return {
     q: q.get("q") || "",
-    agent: q.get("agent") || "",
     category: q.get("category") || "",
     min_price: q.get("min_price") || "",
     max_price: q.get("max_price") || "",
@@ -68,15 +67,12 @@ function StoneTile({ stone }) {
         <span className="cat-tile-code">{stone.code}</span>
         <span className="cat-tile-name">{stone.name}</span>
         <span className={`cat-tile-price ${stone.price ? "" : "is-request"}`}>{formatPrice(stone.price)}</span>
-        <span className="cat-tile-partner">
-          <span className="cat-dot" aria-hidden="true" /> {stone.agent.display_name} · {stone.agent.stall_name}
-        </span>
       </span>
     </Link>
   );
 }
 
-export default function CataloguePage({ agents, search }) {
+export default function CataloguePage({ search }) {
   const filters = readFilters(search);
   const [data, setData] = useState({ items: [], total: 0, categories: [] });
   const [loading, setLoading] = useState(true);
@@ -106,7 +102,7 @@ export default function CataloguePage({ agents, search }) {
   }, []);
 
   const update = (changes) => writeFilters({ ...filters, ...changes });
-  const activeCount = ["agent", "category", "min_price", "max_price"].filter((k) => filters[k]).length + (filters.include_reserved ? 0 : 1);
+  const activeCount = ["category", "min_price", "max_price"].filter((k) => filters[k]).length + (filters.include_reserved ? 0 : 1);
 
   async function loadMore() {
     setLoadingMore(true);
@@ -171,24 +167,6 @@ export default function CataloguePage({ agents, search }) {
         {showFilters && (
           <div className="cat-filters">
             <div className="cat-filter-group">
-              <span className="cat-filter-label">Partner</span>
-              <div className="cat-chips">
-                <button className={`chip ${!filters.agent ? "is-selected" : ""}`} onClick={() => update({ agent: "" })}>
-                  Everyone
-                </button>
-                {agents.map((a) => (
-                  <button
-                    key={a.id}
-                    className={`chip ${filters.agent === a.id ? "is-selected" : ""}`}
-                    style={{ "--stall-accent": a.theme.accent }}
-                    onClick={() => update({ agent: a.id })}
-                  >
-                    {a.display_name} · {a.stall_name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="cat-filter-group">
               <span className="cat-filter-label">Gem</span>
               <div className="cat-chips">
                 <button className={`chip ${!filters.category ? "is-selected" : ""}`} onClick={() => update({ category: "" })}>
@@ -233,7 +211,7 @@ export default function CataloguePage({ agents, search }) {
               {activeCount > 0 && (
                 <button
                   className="cat-clear"
-                  onClick={() => update({ agent: "", category: "", min_price: "", max_price: "", include_reserved: true })}
+                  onClick={() => update({ category: "", min_price: "", max_price: "", include_reserved: true })}
                 >
                   Clear filters
                 </button>
@@ -265,7 +243,7 @@ export default function CataloguePage({ agents, search }) {
         {!loading && data.items.length === 0 && !error && (
           <div className="cat-empty">
             <p>No stones match those filters.</p>
-            <p className="hero-lede">Not finding it? Our AI partners can help, or source it for you.</p>
+            <p className="hero-lede">Not finding it? Our AI gem expert can help, or source it for you.</p>
           </div>
         )}
 

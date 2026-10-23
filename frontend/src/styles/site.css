@@ -404,12 +404,6 @@
 
 /* ---------- partners ---------- */
 
-.partner-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
-  gap: 24px;
-}
-
 .partner-card {
   position: relative;
   display: flex;
@@ -420,6 +414,16 @@
   border: 1px solid var(--panel-border);
   border-top: 3px solid var(--stall-accent);
   box-shadow: var(--shadow);
+}
+
+.partner-card-solo {
+  max-width: 880px;
+  gap: 32px;
+  align-items: center;
+}
+
+.partner-card-solo .partner-card-figure .character {
+  --char-size: 200px;
 }
 
 .partner-card-figure .character {
@@ -780,6 +784,17 @@
 
   .site-footer-meta {
     align-items: center;
+  }
+}
+
+/* Phones: the header button just says the expert's name. */
+@media (max-width: 480px) {
+  .btn-label-extra {
+    display: none;
+  }
+
+  .partner-card-solo .partner-card-figure .character {
+    --char-size: 140px;
   }
 }
 

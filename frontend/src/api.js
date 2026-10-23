@@ -91,8 +91,8 @@ async function chatErrorFrom(res) {
 
 // Read a server-sent event stream. handlers: onDelta(text), onCard(card),
 // onImagePending({id, label, item_name}), onImage({id, image}),
-// onImageFailed({id}), onSuggestions(options), onHandoff(handoff). Resolves
-// with the "done" payload ({reply, cards, images, suggestions, handoff, history}).
+// onImageFailed({id}), onSuggestions(options). Resolves with the "done"
+// payload ({reply, cards, images, suggestions, history}).
 async function readEvents(res, handlers) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -119,7 +119,6 @@ async function readEvents(res, handlers) {
       else if (event === "image") handlers.onImage?.(payload);
       else if (event === "image_failed") handlers.onImageFailed?.(payload);
       else if (event === "suggestions") handlers.onSuggestions?.(payload.options);
-      else if (event === "handoff") handlers.onHandoff?.(payload);
       else if (event === "error") throw new ChatError(payload.message);
       else if (event === "done") done = payload;
     }
@@ -128,7 +127,7 @@ async function readEvents(res, handlers) {
   return done;
 }
 
-// Stream a partner's reply to a customer message.
+// Stream the Gem Expert's reply to a customer message.
 export async function streamChat(agentId, message, history, handlers = {}) {
   const res = await fetch(`${API_URL}/api/chat/stream`, {
     method: "POST",
@@ -139,7 +138,7 @@ export async function streamChat(agentId, message, history, handlers = {}) {
   return readEvents(res, handlers);
 }
 
-// Stream the partner's opening pitch for a stone page.
+// Stream the Gem Expert's opening pitch for a stone page.
 export async function streamPitch(stoneId, handlers = {}) {
   const res = await fetch(`${API_URL}/api/stones/${stoneId}/pitch`, {
     method: "POST",
@@ -163,20 +162,6 @@ export async function fetchStone(id) {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error("Couldn't load this stone");
   return res.json();
-}
-
-export async function routeQuestion(message) {
-  try {
-    const res = await fetch(`${API_URL}/api/route`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    });
-    if (res.ok) return (await res.json()).agent_id;
-  } catch {
-    // Fall through to the default partner.
-  }
-  return null;
 }
 
 export async function fetchFeatured() {

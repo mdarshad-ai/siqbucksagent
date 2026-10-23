@@ -66,7 +66,7 @@ function RequestCard({ r, onChange }) {
             {r.item_name} <span className="admin-muted">· {formatPrice(r.item_price)}</span>
           </div>
           <div className="admin-muted">
-            {r.reference} · {r.agent_id === "siq" ? "Siq" : r.agent_id === "bucks" ? "Bucks" : r.agent_id} · {stock}
+            {r.reference} · {stock}
           </div>
         </div>
         <span className={`pill pill-req-${r.status}`}>{STATUS_LABELS[r.status] || r.status}</span>
@@ -89,7 +89,7 @@ function RequestCard({ r, onChange }) {
           {r.note ? <blockquote>{r.note}</blockquote> : <div className="admin-muted">No note from the customer.</div>}
           {r.transcript && (
             <details>
-              <summary>Their chat with the dealer ({r.transcript.length} messages)</summary>
+              <summary>Their chat with the Gem Expert ({r.transcript.length} messages)</summary>
               <div className="request-transcript">
                 {r.transcript.map((m, i) => (
                   <div key={i} className={`preview-bubble preview-${m.role}`}>
@@ -151,7 +151,7 @@ function RequestCard({ r, onChange }) {
       {r.status === "pending" && (
         <p className="admin-hint">
           Contact the customer, then confirm. Confirming marks a one-off stone as reserved (or sets one aside
-          if you have several) so the dealers tell other customers it's on hold.
+          if you have several) so the Gem Expert tells other customers it's on hold.
         </p>
       )}
     </article>
