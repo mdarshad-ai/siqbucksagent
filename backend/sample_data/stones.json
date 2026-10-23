@@ -1,0 +1,145 @@
+{
+  "_about": "Sample content for the 20 starter stones: one illustrated photo, a story the Gem Expert may tell customers, and private sales guidance. Matched to stones by name. Replace with real details before selling.",
+  "stones": [
+    {
+      "name": "Ceylon Blue Sapphire 2.10ct",
+      "image": "ceylon-blue-sapphire.webp",
+      "caption": "Oval cut, face up",
+      "story": "Cut from rough found in the gem gravels around Ratnapura, Sri Lanka's 'city of gems'. It's unheated, so the cornflower blue is entirely its own, and it stays bright in candlelight rather than going inky the way darker sapphires can. The oval shape makes it look larger than its 2.10 carats on the hand.",
+      "sales_guidance": "Lead with 'unheated' and the GIA report, which is what serious buyers care about most. Ideal for engagement rings and anniversary pieces. If they hesitate on price, compare it with a heated stone of the same size and explain why untreated colour holds its value. Offer to show it as a ring with GemGenerate."
+    },
+    {
+      "name": "Colombian Emerald 1.45ct",
+      "image": "colombian-emerald.webp",
+      "caption": "Emerald cut, face up",
+      "story": "Colombian emeralds are prized for a warm, slightly bluish green that no other source quite matches. This one shows the soft natural inclusions emerald lovers call its 'jardin', the garden, proof it grew in the earth and wasn't made in a lab. The classic step cut shows off its depth of colour.",
+      "sales_guidance": "Reframe inclusions as character and authenticity, never as flaws. Be honest that emeralds need gentler care than sapphires or rubies: no ultrasonic cleaners. Strong for May birthdays and 20th or 35th anniversaries. Suits customers who prefer romance over perfection."
+    },
+    {
+      "name": "Burmese Ruby 1.02ct",
+      "image": "burmese-ruby.webp",
+      "caption": "Round brilliant, face up",
+      "story": "Burmese rubies set the standard for red, and this one has the vivid, glowing tone the trade calls 'pigeon's blood'. It's unheated, which is rare for a Burmese ruby over a carat. Its natural fluorescence makes it seem lit from within, even in soft evening light.",
+      "sales_guidance": "This is a hero stone: let the customer feel how special it is before talking about price. Mention 'unheated' early, and that a ruby this size without heat is genuinely hard to find. Good for milestone gifts and a red engagement ring. Suggest a halo or a simple yellow-gold setting."
+    },
+    {
+      "name": "Paraiba Tourmaline 0.85ct",
+      "image": "paraiba-tourmaline.webp",
+      "caption": "Oval cut, face up",
+      "story": "Paraiba tourmaline glows an electric blue-green thanks to traces of copper, and nothing else in the gem world looks quite like it. This stone comes from Mozambique, where the most important deposits were found after the original Brazilian mines ran low. Under daylight it looks almost neon.",
+      "sales_guidance": "Sell the colour first: invite them to look at the photos in daylight. It's rare, so per-carat prices are high; frame it as a collector's stone, not a big centre stone. Perfect for customers who want something nobody else at the party is wearing."
+    },
+    {
+      "name": "Padparadscha Sapphire 1.30ct",
+      "image": "padparadscha-sapphire.webp",
+      "caption": "Cushion cut, face up",
+      "story": "Padparadscha takes its name from the Sinhalese word for the lotus blossom, and its colour sits somewhere between pink and orange, like a tropical sunset. Only a small share of Sri Lankan sapphires show this balance. The cushion cut softens the corners and suits its gentle, romantic tone.",
+      "sales_guidance": "Tell the lotus-flower story; it lands well. Great for customers who want a coloured engagement stone that feels unique but still classic. Rose gold flatters it most. If asked, explain that the pink-orange balance is what defines a padparadscha."
+    },
+    {
+      "name": "Tanzanite 3.20ct",
+      "image": "tanzanite.webp",
+      "caption": "Trillion cut, face up",
+      "story": "Tanzanite is found in only one place on Earth: a few square kilometres in the foothills of Mount Kilimanjaro, Tanzania. It shows violet and blue depending on how you turn it. The bold trillion cut throws light from three sharp corners and makes a striking pendant or statement ring.",
+      "sales_guidance": "The 'one place on Earth' fact sells it. At over three carats it gives a lot of presence for the money compared with sapphire, so position it as great value for impact. Mention it's softer than sapphire, so pendants and earrings suit everyday wear best."
+    },
+    {
+      "name": "Vivid Pink Spinel 1.15ct",
+      "image": "vivid-pink-spinel.webp",
+      "caption": "Oval cut, face up",
+      "story": "For centuries spinels were mistaken for rubies; some of the 'rubies' in Europe's crown jewels are actually spinel. This vivid pink spinel from Burma is untreated, with a bright, lively sparkle. It's hard enough for everyday wear and far rarer than most people realise.",
+      "sales_guidance": "Use the crown-jewels story; it's memorable. Good for customers drawn to pink who want something more unusual than pink sapphire. No treatment is a strong point. It also works for a pair of earrings with a matching ring."
+    },
+    {
+      "name": "Santa Maria Aquamarine 4.50ct",
+      "image": "santa-maria-aquamarine.webp",
+      "caption": "Emerald cut, face up",
+      "story": "'Santa Maria' is the name the trade gives the deepest, most saturated aquamarines, after the Santa Maria de Itabira mine in Brazil. Most aquamarine is a pale, watery blue; this one has a rich sea-blue that holds its colour even in a large stone. The step cut makes it look like clear tropical water.",
+      "sales_guidance": "Explain what 'Santa Maria' means: it signals top colour. A generous 4.5 carats at a friendly price, so a great choice for a statement cocktail ring or a March birthstone gift. White gold or platinum keeps the blue crisp."
+    },
+    {
+      "name": "Alexandrite 0.62ct",
+      "image": "alexandrite.webp",
+      "caption": "Round cut, face up",
+      "story": "Alexandrite changes colour with the light: teal-green in daylight and raspberry-purple under warm lamplight. It's said to have been named after the Russian tsar Alexander II after first being found in the Ural Mountains. This stone is from Brazil and shows a clear, distinct change.",
+      "sales_guidance": "Describe the colour change vividly, and encourage the customer to imagine it at dinner versus daytime. Rare and sought after by collectors, which justifies the price for a smaller stone. A perfect June birthstone gift. Don't overstate the strength of the change; call it 'distinct'."
+    },
+    {
+      "name": "Black Opal 2.80ct",
+      "image": "black-opal.webp",
+      "caption": "Freeform cabochon",
+      "story": "Black opals from Lightning Ridge in New South Wales are the most valued opals in the world. The dark body makes the flashes of colour leap out. This freeform cabochon was cut to follow the natural pattern rather than force a shape, so the play of colour shifts every time it moves. No two are alike.",
+      "sales_guidance": "Emphasise 'no two alike' and invite them to imagine it moving on the hand. Recommend a protective bezel setting and gentle care: opals don't like knocks or harsh chemicals. Ideal for an artistic, one-of-a-kind buyer and for October birthdays."
+    },
+    {
+      "name": "Citrine Cluster Lot (15ct)",
+      "image": "citrine-cluster-lot.webp",
+      "caption": "Mixed pieces",
+      "story": "A handful of natural golden citrine from Brazil, with about 15 carats in mixed pieces. Citrine has long been called the 'merchant's stone' and is linked with sunshine and prosperity. These sunny pieces are perfect for crafting, wire-wrapping, or just a bowl of gold on the desk.",
+      "sales_guidance": "Keep it fun and affordable. Pitch it to makers, crafters and gift-buyers under $50. Mention the 'merchant's stone' idea for new businesses or a housewarming. Happy to suggest two lots."
+    },
+    {
+      "name": "Amethyst Point (8ct)",
+      "image": "amethyst-point.webp",
+      "caption": "Natural terminated point",
+      "story": "A natural amethyst point from Uruguay, known for some of the deepest purple amethyst anywhere. It's been left just as it grew, with its six-sided tip intact. The ancient Greeks believed amethyst kept you clear-headed, and it's still a favourite for desks and bedside tables.",
+      "sales_guidance": "Great entry-level gift, especially for February birthdays. Mention the Uruguayan colour and the natural, uncut tip. Pairs nicely with the rose quartz sphere or the citrine lot as a set."
+    },
+    {
+      "name": "Rainbow Moonstone Cabochon (3.5ct)",
+      "image": "rainbow-moonstone.webp",
+      "caption": "Cabochon, showing its blue flash",
+      "story": "Rainbow moonstone from India glows with a floating blue light called adularescence, which drifts across the stone as it moves, like moonlight on water. It's traditionally linked with intuition and new beginnings, and this cabochon has a strong, clean flash.",
+      "sales_guidance": "Describe the moving flash; it's the whole appeal. A lovely affordable gift, and popular for June birthdays and new-baby or new-chapter presents. Recommend silver or white gold to keep it soft and dreamy."
+    },
+    {
+      "name": "Garnet Melee 5-Pack (0.20ct ea)",
+      "image": "garnet-melee-5-pack.webp",
+      "caption": "Five calibrated rounds",
+      "story": "Five matched little red garnets, each about a fifth of a carat and calibrated to the same size, ready for a jeweller's bench. Garnet has been worn since ancient Egypt and is the January birthstone. They're ideal as accent stones or for a family ring.",
+      "sales_guidance": "Pitch to jewellers, makers and anyone designing a custom piece, such as a ring with one stone per family member. Mention they're calibrated, which saves a jeweller time. Very affordable; suggest two packs for symmetrical designs."
+    },
+    {
+      "name": "Peridot 1.8ct",
+      "image": "peridot.webp",
+      "caption": "Round cut, face up",
+      "story": "This bright olive-green peridot comes from the high mountains of Pakistan, a source known for lively, clean crystals. Peridot is one of the few gems that forms deep in the Earth's mantle, and some has even arrived on meteorites. It's the August birthstone and full of summery sparkle.",
+      "sales_guidance": "The 'from deep in the Earth, even from space' fact is a great hook. Positioned as a cheerful, affordable everyday stone, it's perfect for August birthdays and lighthearted gifts. Yellow gold makes the green pop."
+    },
+    {
+      "name": "Smoky Quartz 6ct",
+      "image": "smoky-quartz.webp",
+      "caption": "Pear cut, face up",
+      "story": "A warm, whisky-brown smoky quartz from Brazil, cut as a generous pear. Its earthy colour comes from natural radiation in the rocks where it grew. It's a sophisticated, understated stone that looks wonderful in a pendant and suits warm autumn tones.",
+      "sales_guidance": "Pitch it as an elegant, gender-neutral piece with big size for a small price. Good for men's jewellery and minimalist buyers. Suggest a simple pendant or a statement ring in rose or yellow gold."
+    },
+    {
+      "name": "Labradorite Slab (40mm)",
+      "image": "labradorite-slab.webp",
+      "caption": "Polished slab with blue schiller",
+      "story": "Polished labradorite from Madagascar, with the flash of colour known as labradorescence: blue, teal and gold that appear and vanish as you tilt it. An Inuit legend says the northern lights were once trapped in these stones. It looks like a dark grey stone until it catches the light just right.",
+      "sales_guidance": "Tell the northern-lights legend and encourage them to imagine tilting it. Popular with collectors, crystal lovers and makers. A great desk piece or base for a big pendant. Affordable."
+    },
+    {
+      "name": "Blue Zircon 1.2ct",
+      "image": "blue-zircon.webp",
+      "caption": "Round cut, face up",
+      "story": "Natural zircon is one of the most brilliant gems there is, with more fire than sapphire. This bright blue zircon from Cambodia sparkles with flashes of rainbow colour. Don't confuse it with cubic zirconia: zircon is a genuine natural gem, and the oldest minerals on Earth are zircons.",
+      "sales_guidance": "Clear up the cubic zirconia confusion straight away. Then sell the fire and the 'oldest minerals on Earth' fact. A December birthstone with high sparkle at a very approachable price. Great for earrings."
+    },
+    {
+      "name": "Rose Quartz Sphere (30mm)",
+      "image": "rose-quartz-sphere.webp",
+      "caption": "Polished sphere",
+      "story": "A hand-polished sphere of soft pink rose quartz from Brazil. Rose quartz has long been called the stone of love and kindness. It's a calming, gentle piece that catches the light on a windowsill or bedside table.",
+      "sales_guidance": "A lovely gift for anniversaries, friendships or self-care. Mention the love-and-kindness tradition, but don't make health claims. Pairs with the amethyst point as a gift set."
+    },
+    {
+      "name": "Turquoise Cabochon 4ct",
+      "image": "turquoise-cabochon.webp",
+      "caption": "Cabochon with light matrix",
+      "story": "Natural robin's-egg turquoise from Nevada, with a delicate web of matrix, the host rock it formed in. American turquoise from historic mines is treasured by collectors, and the matrix makes every stone unique. It's the December birthstone and has been worn as a protective stone for thousands of years.",
+      "sales_guidance": "Highlight 'natural' (much turquoise on the market is stabilised or dyed) and Nevada origin. Collectors love American turquoise. It suits silver and boho styles, and it's a December birthstone. Mention gentle care: keep it away from oils and perfume."
+    }
+  ]
+}

@@ -14,6 +14,7 @@ import gemgenerate
 import limits
 import media
 import reservations
+import samples
 import storage
 from agent_config import CORE_RULES
 from chat_core import ChatMessage, ChatResponse, NonEmptyStr, run_chat
@@ -567,6 +568,28 @@ def test_image_model(req: ImageTestRequest, user: dict = Depends(auth.require_ow
             status_code=502,
             detail="The image model failed. Check the model id supports image input and output on OpenRouter.",
         )
+
+
+# ---------- sample content (owners only) ----------
+
+@router.get("/samples")
+def sample_status(user: dict = Depends(auth.require_owner)):
+    return samples.status()
+
+
+@router.post("/samples/load")
+def load_samples(user: dict = Depends(auth.require_owner)):
+    """Fill missing photos, stories and guidance on the starter stones."""
+    try:
+        return {**samples.apply(), "status": samples.status()}
+    except storage.StorageError as exc:
+        logger.exception("Couldn't load sample photos")
+        raise HTTPException(status_code=502, detail=f"Couldn't save the sample photos: {exc}")
+
+
+@router.post("/samples/remove")
+def remove_samples(user: dict = Depends(auth.require_owner)):
+    return {**samples.remove(), "status": samples.status()}
 
 
 # ---------- reservation requests (owners and staff) ----------

@@ -251,6 +251,15 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
 - **Users** (owners only): add owners or staff. A new user gets a one-time
   temporary password (shown once) and must choose their own at first login.
   Owners can change roles, reset passwords and remove users.
+- **Sample content** (owners only, in Settings): *Load sample content*
+  gives the 20 starter stones an illustrated photo, a story and private
+  sales guidance (`backend/sample_data/`), so the shop looks complete
+  before real photos exist. It only fills gaps — stones with their own
+  photos, and stories or guidance someone wrote, are left alone — and
+  matches stones by name. *Remove sample content* takes out the sample
+  photos and any sample text still unedited. The photos are illustrations
+  marked "Sample image", drawn by `tools/render_sample_stones.py`
+  (`pip install pillow numpy`, then run it to redraw them).
 - **Forgot password?** (link on the login page): there's no email reset.
   Staff ask an owner to *Reset password* under *Users*. An owner who is
   locked out uses the recovery switch: in Render → Environment set
