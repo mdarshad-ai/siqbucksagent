@@ -911,6 +911,42 @@
   text-align: center;
 }
 
+.admin-link {
+  display: block;
+  margin: 0.9rem auto 0;
+  border: 0;
+  background: none;
+  color: var(--gold-soft, #e8c875);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-forgot {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.admin-forgot p {
+  margin: 0 0 0.6rem;
+}
+
+.admin-forgot p:last-child {
+  margin-bottom: 0;
+}
+
+.admin-forgot code {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- GemGenerate ---------- */
 
 .gemgen-model-row {

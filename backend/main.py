@@ -40,6 +40,7 @@ if os.environ.get("RENDER") and not os.environ.get("SUPABASE_URL"):
     )
 database.init_db()
 auth.bootstrap_owner()
+auth.reset_owner_password()
 limits.prune_old_counters()
 try:
     storage.get_storage().ensure_ready()
