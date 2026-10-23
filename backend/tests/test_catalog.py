@@ -7,13 +7,13 @@ import database
 import llm_service
 from conftest import response, tool_call
 from test_agent_flow import sse_events
-from test_media import JPEG, MP4, add_photo, add_video, siq_item_id, upload
+from test_media import JPEG, MP4, add_photo, add_video, stone_id, upload
 
 PDF = b"%PDF-1.4 fake certificate"
 
 
 def by_name(name):
-    return next(i for i in database.list_items("siq") + database.list_items("bucks") if i["name"] == name)
+    return next(i for i in database.list_items("gem-expert") + database.list_items("gem-expert") if i["name"] == name)
 
 
 def catalog(client, **params):
@@ -27,14 +27,14 @@ def test_catalog_lists_browsable_stones(client):
     assert data["total"] == 20 and len(data["items"]) == 20
     assert "Sapphire" in data["categories"]
     entry = next(i for i in data["items"] if i["name"] == "Burmese Ruby 1.02ct")
-    assert entry["code"] == f"LXS-{entry['id']:04d}"
-    assert entry["agent"]["display_name"] == "Siq" and entry["image_url"] is None
+    assert entry["code"] == f"LXG-{entry['id']:04d}"
+    assert entry["agent"]["display_name"] == "Gem Expert" and entry["image_url"] is None
     assert "sales_guidance" not in entry and "story" not in entry
 
     alex = by_name("Alexandrite 0.62ct")
-    database.update_item("siq", alex["id"], {"status": "sold"})
+    database.update_item("gem-expert", alex["id"], {"status": "sold"})
     ruby = by_name("Burmese Ruby 1.02ct")
-    database.update_item("siq", ruby["id"], {"status": "reserved"})
+    database.update_item("gem-expert", ruby["id"], {"status": "reserved"})
     names = [i["name"] for i in catalog(client, limit=60)["items"]]
     assert "Alexandrite 0.62ct" not in names and "Burmese Ruby 1.02ct" in names
     names = [i["name"] for i in catalog(client, limit=60, include_reserved="false")["items"]]
@@ -42,7 +42,7 @@ def test_catalog_lists_browsable_stones(client):
 
 
 def test_catalog_filters_sort_and_pages(client):
-    assert {i["agent"]["id"] for i in catalog(client, agent="bucks", limit=60)["items"]} == {"bucks"}
+    assert {i["agent"]["id"] for i in catalog(client, agent="gem-expert", limit=60)["items"]} == {"gem-expert"}
     assert {i["name"] for i in catalog(client, category="sapphire")["items"]} == {
         "Padparadscha Sapphire 1.30ct", "Ceylon Blue Sapphire 2.10ct",
     }
@@ -61,20 +61,20 @@ def test_catalog_filters_sort_and_pages(client):
 
 
 def test_catalog_image_is_chosen_or_first_photo(client, staff):
-    item_id = siq_item_id()
+    item_id = stone_id()
     first = add_photo(client, staff, item_id)
     second = add_photo(client, staff, item_id)
     image = lambda: next(i for i in catalog(client, limit=60)["items"] if i["id"] == item_id)["image_url"]
     assert image() == first["url"]
 
-    base = f"/api/admin/agents/siq/items/{item_id}"
+    base = f"/api/admin/agents/gem-expert/items/{item_id}"
     listed = client.put(f"{base}/catalog-image", json={"media_id": second["id"]}, headers=staff).json()
     assert [m["is_catalog"] for m in listed] == [False, True]
     assert image() == second["url"]
 
     video = add_video(client, staff, item_id)
     assert client.put(f"{base}/catalog-image", json={"media_id": video["id"]}, headers=staff).status_code == 400
-    other = add_photo(client, staff, siq_item_id("Colombian Emerald 1.45ct"))
+    other = add_photo(client, staff, stone_id("Colombian Emerald 1.45ct"))
     assert client.put(f"{base}/catalog-image", json={"media_id": other["id"]}, headers=staff).status_code == 400
 
     # Deleting the chosen photo falls back to the first one.
@@ -85,7 +85,7 @@ def test_catalog_image_is_chosen_or_first_photo(client, staff):
 def test_stock_code_can_be_set(client, staff):
     ruby = by_name("Burmese Ruby 1.02ct")
     body = {k: ruby[k] for k in database.ITEM_EDITABLE_FIELDS}
-    client.put(f"/api/admin/agents/siq/items/{ruby['id']}", json={**body, "sku": "RL1803"}, headers=staff)
+    client.put(f"/api/admin/agents/gem-expert/items/{ruby['id']}", json={**body, "sku": "RL1803"}, headers=staff)
     assert next(i for i in catalog(client, q="RL1803")["items"])["code"] == "RL1803"
 
 
@@ -94,7 +94,7 @@ def test_stock_code_can_be_set(client, staff):
 def add_certificate(client, headers, item_id, data=PDF, content_type="application/pdf", **fields):
     path = upload(client, headers, item_id, data, content_type, purpose="certificate")
     res = client.post(
-        f"/api/admin/agents/siq/items/{item_id}/certificates",
+        f"/api/admin/agents/gem-expert/items/{item_id}/certificates",
         json={"path": path, "content_type": content_type, "size_bytes": len(data), **fields},
         headers=headers,
     )
@@ -103,19 +103,19 @@ def add_certificate(client, headers, item_id, data=PDF, content_type="applicatio
 
 
 def test_certificates(client, staff):
-    item_id = siq_item_id()
+    item_id = stone_id()
     pdf = add_certificate(client, staff, item_id, title="Report", lab="GIA", number="2141438")
     scan = add_certificate(client, staff, item_id, data=JPEG, content_type="image/jpeg", lab="GRS")
     assert pdf["kind"] == "pdf" and scan["kind"] == "image"
     assert client.get(pdf["url"]).content == PDF
 
-    base = f"/api/admin/agents/siq/items/{item_id}/certificates"
+    base = f"/api/admin/agents/gem-expert/items/{item_id}/certificates"
     edited = client.patch(f"{base}/{scan['id']}", json={"title": "Scan", "number": "X1"}, headers=staff).json()
     assert edited["number"] == "X1" and edited["lab"] == "GRS"  # only the fields sent change
     assert [c["lab"] for c in client.get(base, headers=staff).json()] == ["GIA", "GRS"]
 
     # Partners know about them.
-    details = json.loads(llm_service._run_tool("siq", "get_item_details", {"item_id": item_id}))["item"]
+    details = json.loads(llm_service._run_tool("gem-expert", "get_item_details", {"item_id": item_id}))["item"]
     assert details["certificates"] == ["GIA Report 2141438", "GRS Scan X1"]
 
     assert client.delete(f"{base}/{pdf['id']}", headers=staff).status_code == 204
@@ -123,25 +123,25 @@ def test_certificates(client, staff):
 
     # Videos aren't certificates.
     res = client.post(
-        f"/api/admin/agents/siq/items/{item_id}/media/upload-url",
+        f"/api/admin/agents/gem-expert/items/{item_id}/media/upload-url",
         json={"content_type": "video/mp4", "size_bytes": 10, "purpose": "certificate"}, headers=staff,
     )
     assert res.status_code == 400
 
     # Deleting the stone removes certificate files too.
-    client.delete(f"/api/admin/agents/siq/items/{item_id}", headers=staff)
+    client.delete(f"/api/admin/agents/gem-expert/items/{item_id}", headers=staff)
     assert client.get(scan["url"]).status_code == 404
 
 
 # ---------- stone page ----------
 
 def test_stone_page(client, staff):
-    item_id = siq_item_id()
-    ruby = database.get_item("siq", item_id)
-    database.update_item("siq", item_id, {"story": "Cut in Mogok.", "sales_guidance": "SECRET"})
+    item_id = stone_id()
+    ruby = database.get_item("gem-expert", item_id)
+    database.update_item("gem-expert", item_id, {"story": "Cut in Mogok.", "sales_guidance": "SECRET"})
     first = add_photo(client, staff, item_id)
     chosen = add_photo(client, staff, item_id)
-    client.put(f"/api/admin/agents/siq/items/{item_id}/catalog-image", json={"media_id": chosen["id"]}, headers=staff)
+    client.put(f"/api/admin/agents/gem-expert/items/{item_id}/catalog-image", json={"media_id": chosen["id"]}, headers=staff)
     add_certificate(client, staff, item_id, lab="GIA")
 
     page = client.get(f"/api/stones/{item_id}").json()
@@ -149,9 +149,9 @@ def test_stone_page(client, staff):
     assert "sales_guidance" not in page and "SECRET" not in json.dumps(page)
     assert [m["id"] for m in page["media"]] == [chosen["id"], first["id"]]  # catalogue photo leads
     assert page["certificates"][0]["lab"] == "GIA"
-    assert page["agent"]["id"] == "siq" and page["code"].startswith("LXS-")
+    assert page["agent"]["id"] == "gem-expert" and page["code"].startswith("LXG-")
 
-    database.update_item("siq", item_id, {"status": "sold"})
+    database.update_item("gem-expert", item_id, {"status": "sold"})
     assert client.get(f"/api/stones/{item_id}").status_code == 404
     assert client.get("/api/stones/99999").status_code == 404
 
@@ -159,7 +159,7 @@ def test_stone_page(client, staff):
 # ---------- the partner's pitch ----------
 
 def test_pitch_is_written_once_then_replayed(client, fake_llm):
-    item_id = siq_item_id()
+    item_id = stone_id()
     llm = fake_llm(
         response(content="Let me look.", tool_calls=[tool_call("c1", "show_item", json.dumps({"item_id": item_id}))]),
         response(content="A vivid, unheated Burmese ruby.", tool_calls=[
@@ -181,18 +181,18 @@ def test_pitch_is_written_once_then_replayed(client, fake_llm):
     assert replay[-1][1]["suggestions"] == ["Is it certified?"]
 
     # Editing the stone makes the partner write a fresh pitch.
-    database.update_item("siq", item_id, {"story": "New story"})
+    database.update_item("gem-expert", item_id, {"story": "New story"})
     llm = fake_llm(response(content="Fresh pitch."))
     assert sse_events(client.post(f"/api/stones/{item_id}/pitch").text)[-1][1]["reply"] == "Fresh pitch."
     assert len(llm.requests) == 1
 
 
 def test_pitch_history_continues_in_chat(client, fake_llm):
-    item_id = siq_item_id()
+    item_id = stone_id()
     fake_llm(response(content="A fine ruby."))
     history = sse_events(client.post(f"/api/stones/{item_id}/pitch").text)[-1][1]["history"]
     llm = fake_llm(response(content="Yes, GIA."))
-    res = client.post("/api/chat", json={"agent_id": "siq", "message": "Certified?", "history": history}).json()
+    res = client.post("/api/chat", json={"agent_id": "gem-expert", "message": "Certified?", "history": history}).json()
     sent = llm.requests[0]["messages"]
     assert sent[1]["role"] == "user" and "stone #" in sent[1]["content"]
     assert res["history"][0]["hidden"] is True
@@ -200,7 +200,7 @@ def test_pitch_history_continues_in_chat(client, fake_llm):
 
 def test_new_pitches_count_toward_limits_but_saved_ones_are_free(client, owner, fake_llm):
     client.put("/api/admin/settings/limits", json={"global_daily_limit": 1}, headers=owner)
-    ruby, emerald = siq_item_id(), siq_item_id("Colombian Emerald 1.45ct")
+    ruby, emerald = stone_id(), stone_id("Colombian Emerald 1.45ct")
     fake_llm(response(content="Ruby pitch."))
     assert client.post(f"/api/stones/{ruby}/pitch").status_code == 200
     fake_llm()
@@ -210,7 +210,7 @@ def test_new_pitches_count_toward_limits_but_saved_ones_are_free(client, owner, 
 
 
 def test_pitch_errors_are_not_saved(client, fake_llm):
-    item_id = siq_item_id()
+    item_id = stone_id()
     fake_llm(RuntimeError("boom"))
     assert sse_events(client.post(f"/api/stones/{item_id}/pitch").text)[-1][0] == "error"
     assert database.get_pitch(item_id) is None

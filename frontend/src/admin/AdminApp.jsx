@@ -115,7 +115,7 @@ export function ChangePasswordForm({ forced, onDone, onCancel }) {
 const TABS = [
   { id: "inventory", label: "Inventory", ownerOnly: false },
   { id: "requests", label: "Requests", ownerOnly: false },
-  { id: "agents", label: "Agents", ownerOnly: true },
+  { id: "agents", label: "Gem Expert", ownerOnly: true },
   { id: "users", label: "Users", ownerOnly: true },
   { id: "settings", label: "Settings", ownerOnly: true },
 ];

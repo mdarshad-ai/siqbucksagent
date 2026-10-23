@@ -10,7 +10,7 @@ from conftest import response, tool_call
 
 
 def item(name):
-    return next(i for i in database.list_items("siq") + database.list_items("bucks") if i["name"] == name)
+    return next(i for i in database.list_items("gem-expert") + database.list_items("gem-expert") if i["name"] == name)
 
 
 def request_hold(client, stone, visitor="visitor-aaaa", ip="203.0.113.9", **extra):
@@ -40,7 +40,7 @@ def test_request_is_pending_and_does_not_touch_stock(client, staff):
     res = request_hold(client, ruby)
     assert res.status_code == 201 and res.json()["reference"].startswith("LX-")
 
-    assert database.get_item("siq", ruby["id"])["status"] == "available"
+    assert database.get_item("gem-expert", ruby["id"])["status"] == "available"
     pending = requests_in(client, staff, "pending")
     assert len(pending) == 1
     r = pending[0]
@@ -72,12 +72,12 @@ def test_request_validation(client, bad):
 
 def test_sold_or_unknown_stones_cannot_be_requested(client):
     alex = item("Alexandrite 0.62ct")
-    database.update_item("siq", alex["id"], {"status": "sold", "quantity": 0})
+    database.update_item("gem-expert", alex["id"], {"status": "sold", "quantity": 0})
     assert request_hold(client, alex).status_code == 409
     fake = {**alex, "id": 99999}
     assert request_hold(client, fake).status_code == 404
-    # A stone can't be requested through the other dealer.
-    assert request_hold(client, {**item("Burmese Ruby 1.02ct"), "agent_id": "bucks"}).status_code == 404
+    # Nor through an agent that doesn't exist.
+    assert request_hold(client, {**item("Burmese Ruby 1.02ct"), "agent_id": "nobody"}).status_code == 404
 
 
 def test_honeypot_stores_nothing(client, staff):
@@ -172,12 +172,12 @@ def test_expired_holds_are_released_automatically(client, staff):
     request_hold(client, ruby)
     r = requests_in(client, staff, "pending")[0]
     client.post(f"/api/admin/reservations/{r['id']}/confirm", json={"hold_days": 1}, headers=staff)
-    assert database.get_item("siq", ruby["id"])["status"] == "reserved"
+    assert database.get_item("gem-expert", ruby["id"])["status"] == "reserved"
 
     database.update_reservation(r["id"], {"hold_until": datetime.now(timezone.utc) - timedelta(minutes=1)})
     reservations.sweep(force=True)
 
-    assert database.get_item("siq", ruby["id"])["status"] == "available"
+    assert database.get_item("gem-expert", ruby["id"])["status"] == "available"
     assert database.get_reservation(r["id"])["status"] == "expired"
 
 
@@ -209,11 +209,11 @@ def test_show_item_can_highlight_reserve(client, fake_llm):
         response(tool_calls=[tool_call("c1", "show_item", json.dumps({"item_id": ruby["id"], "suggest_reserve": True}))]),
         response(content="Use the Reserve button below."),
     )
-    card = client.post("/api/chat", json={"agent_id": "siq", "message": "I want it"}).json()["cards"][0]
+    card = client.post("/api/chat", json={"agent_id": "gem-expert", "message": "I want it"}).json()["cards"][0]
     assert card["suggest_reserve"] is True
 
     # Not for a stone that's already on hold.
-    database.update_item("siq", ruby["id"], {"status": "reserved"})
+    database.update_item("gem-expert", ruby["id"], {"status": "reserved"})
     shown = []
-    llm_service._run_tool("siq", "show_item", {"item_id": ruby["id"], "suggest_reserve": True}, shown)
+    llm_service._run_tool("gem-expert", "show_item", {"item_id": ruby["id"], "suggest_reserve": True}, shown)
     assert shown[0]["suggest_reserve"] is False and shown[0]["status"] == "reserved"

@@ -94,7 +94,7 @@ export default function SettingsTab() {
         <h3>Chat limits</h3>
         <p className="admin-muted">
           Protects your OpenRouter bill. Customers who hit a limit get a friendly message from the
-          dealer instead of an answer.
+          Gem Expert instead of an answer.
         </p>
         <div className="form-grid">
           {FIELDS.map(([key, label, hint]) => (

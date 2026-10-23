@@ -61,22 +61,22 @@ def stream_pitch(item: dict, agent: dict):
             yield _sse("suggestions", {"options": saved["suggestions"]})
         yield _sse("done", {
             "reply": saved["reply"], "cards": [], "suggestions": saved["suggestions"],
-            "handoff": None, "history": _history(message, saved["reply"], saved["suggestions"]),
+            "history": _history(message, saved["reply"], saved["suggestions"]),
         })
 
     def generate():
         try:
             for event in stream_agent(item["agent_id"], message, []):
                 kind = event.pop("type")
-                # The page already shows this stone, so cards and handoffs
-                # from the opening pitch are dropped.
-                if kind in ("card", "handoff"):
+                # The page already shows this stone, so cards from the
+                # opening pitch are dropped.
+                if kind == "card":
                     continue
                 if kind == "done":
                     database.save_pitch(item["id"], fingerprint(item, agent), event["reply"], event["suggestions"])
                     yield _sse("done", {
                         "reply": event["reply"], "cards": [], "suggestions": event["suggestions"],
-                        "handoff": None, "history": _history(message, event["reply"], event["suggestions"]),
+                        "history": _history(message, event["reply"], event["suggestions"]),
                     })
                 else:
                     yield _sse(kind, event)

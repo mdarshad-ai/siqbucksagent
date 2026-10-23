@@ -42,48 +42,8 @@
   font-size: 1.1rem;
 }
 
-.counter-switch {
-  display: inline-flex;
-  gap: 4px;
-  margin: 0 auto;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.counter-switch button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  border: 0;
-  border-radius: 999px;
-  padding: 0.4rem 1rem;
-  background: transparent;
-  color: var(--text-dim);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.counter-switch button.is-current {
-  background: var(--stall-accent);
-  color: #fff;
-}
-
-.counter-switch button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.counter-switch-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--stall-accent);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
-}
-
 .counter-close {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
@@ -291,33 +251,6 @@
   }
 }
 
-.handoff {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  max-width: min(78%, 560px);
-  padding: 0.7rem 0.9rem;
-  border-radius: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  color: var(--text-dim);
-  font-size: 0.9rem;
-}
-
-.handoff button {
-  border: 0;
-  border-radius: 999px;
-  padding: 0.45rem 0.95rem;
-  background: var(--gold);
-  color: #140e05;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.handoff button:disabled {
-  opacity: 0.5;
-}
-
 .chat-error {
   align-self: stretch;
   padding: 0.7rem 0.9rem;
@@ -374,17 +307,11 @@
     gap: 0.5rem;
   }
 
-  .counter-brand span,
   .counter-close-label {
     display: none;
   }
 
-  .counter-switch {
-    margin: 0;
-  }
-
   .counter-close {
-    margin-left: auto;
     padding: 0.45rem 0.7rem;
   }
 
@@ -466,8 +393,7 @@
     padding: 10px 12px 14px;
   }
 
-  .chat-bubble,
-  .handoff {
+  .chat-bubble {
     max-width: 88%;
   }
 }

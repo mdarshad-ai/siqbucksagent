@@ -4,9 +4,9 @@ import PreviewCards from "../components/PreviewCard.jsx";
 import RichText from "../components/RichText.jsx";
 import StoneCard from "../components/StoneCard.jsx";
 import { LogoMark } from "../site/Logo.jsx";
-import { partnerCopy } from "../site/partners.js";
+import { EXPERT_COPY } from "../site/expert.js";
 
-function Turn({ turn, history, partner, onHandoff, disabled }) {
+function Turn({ turn, history, partner }) {
   return (
     <div className={`chat-turn chat-turn-${turn.role}`}>
       {(turn.content || turn.role === "user") && (
@@ -23,38 +23,15 @@ function Turn({ turn, history, partner, onHandoff, disabled }) {
         </div>
       )}
       <PreviewCards images={turn.images} partner={partner} getTranscript={() => history} />
-      {turn.handoff && (
-        <div className="handoff">
-          <span>
-            {turn.handoff.display_name} at {turn.handoff.stall_name} can help with this.
-          </span>
-          <button onClick={() => onHandoff(turn.handoff)} disabled={disabled}>
-            Continue with {turn.handoff.display_name} <span aria-hidden="true">→</span>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
 
-export default function CounterView({
-  agents,
-  agent,
-  history,
-  live,
-  busy,
-  error,
-  restored,
-  onSend,
-  onSwitch,
-  onClose,
-  onHandoff,
-  onStartFresh,
-}) {
+export default function CounterView({ agent, history, live, busy, error, restored, onSend, onClose, onStartFresh }) {
   const [input, setInput] = useState("");
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
-  const copy = partnerCopy(agent.id);
+  const copy = EXPERT_COPY;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -106,22 +83,6 @@ export default function CounterView({
           <LogoMark size={26} />
           <span>Luxuria Gems</span>
         </span>
-        <div className="counter-switch" role="tablist" aria-label="Choose an AI partner">
-          {agents.map((a) => (
-            <button
-              key={a.id}
-              role="tab"
-              aria-selected={a.id === agent.id}
-              className={a.id === agent.id ? "is-current" : ""}
-              style={{ "--stall-accent": a.theme.accent }}
-              onClick={() => onSwitch(a.id)}
-              disabled={busy && a.id !== agent.id}
-            >
-              <span className="counter-switch-dot" />
-              {a.display_name}
-            </button>
-          ))}
-        </div>
         <button className="counter-close" onClick={onClose}>
           <span className="counter-close-label">Back to the shop</span>
           <span aria-hidden="true">✕</span>
@@ -166,14 +127,7 @@ export default function CounterView({
                 </div>
               )}
               {turns.map((turn, i) => (
-                <Turn
-                  key={i}
-                  turn={turn}
-                  history={history}
-                  partner={agent.display_name}
-                  onHandoff={onHandoff}
-                  disabled={busy}
-                />
+                <Turn key={i} turn={turn} history={history} partner={agent.display_name} />
               ))}
               {busy && !live?.content && !live?.cards?.length && !live?.images?.length && (
                 <div className="chat-bubble chat-bubble-assistant chat-bubble-thinking" aria-label="Thinking">
@@ -205,14 +159,14 @@ export default function CounterView({
               }}
             >
               <label className="visually-hidden" htmlFor="counter-message">
-                Message {agent.display_name}
+                Message our {agent.display_name}
               </label>
               <input
                 id="counter-message"
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={`Ask ${agent.display_name} anything...`}
+                placeholder={`Ask our ${agent.display_name} anything...`}
                 maxLength={2000}
                 autoComplete="off"
               />

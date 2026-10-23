@@ -1,4 +1,4 @@
-// Chat limit messages in the partner's own voice rather than a bare error.
+// Chat limit messages in the Gem Expert's own voice rather than a bare error.
 
 function waitText(seconds) {
   const minutes = Math.ceil((seconds || 60) / 60);
@@ -13,7 +13,7 @@ export function friendlyChatError(err, name) {
     return `${name} smiles. "That's plenty of questions for one day. Come back tomorrow and I'll be here."`;
   }
   if (err.code === "closed") {
-    return "The counters are closed for tonight. Please come back tomorrow.";
+    return "The counter is closed for tonight. Please come back tomorrow.";
   }
   return err.message;
 }

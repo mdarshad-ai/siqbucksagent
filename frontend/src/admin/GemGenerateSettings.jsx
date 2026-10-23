@@ -72,7 +72,7 @@ export default function GemGenerateSettings({ usage, onSaved }) {
       <form className="admin-card" onSubmit={saveLimits}>
         <h3>GemGenerate · AI jewellery previews</h3>
         <p className="admin-muted">
-          Siq and Bucks can sketch a stone set in a ring, pendant, earring or bracelet, from the
+          The Gem Expert can sketch a stone set in a ring, pendant, earring or bracelet, from the
           stone's catalogue photo. Each preview is labelled as an AI preview. Repeat requests reuse
           the saved picture for free.
         </p>
@@ -93,7 +93,7 @@ export default function GemGenerateSettings({ usage, onSaved }) {
               checked={form.image_enabled}
               onChange={(e) => setForm((f) => ({ ...f, image_enabled: e.target.checked }))}
             />
-            <span>Let the partners make AI previews for customers</span>
+            <span>Let the Gem Expert make AI previews for customers</span>
           </label>
           {LIMIT_FIELDS.map(([key, text]) => (
             <label key={key}>
@@ -216,16 +216,18 @@ function ModelTester({ status, onUse, busy: saving }) {
         OpenRouter.
       </p>
       <div className="form-grid">
-        <label>
-          Partner
-          <select value={req.agent_id} onChange={set("agent_id")}>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.display_name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {agents.length > 1 && (
+          <label>
+            Partner
+            <select value={req.agent_id} onChange={set("agent_id")}>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           Stone (with photos)
           <select value={req.item_id} onChange={set("item_id")} required>

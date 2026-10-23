@@ -166,7 +166,7 @@ export default function UsersTab({ me }) {
         </table>
       </div>
       <p className="admin-hint">
-        Owners can manage users and edit Siq's and Bucks's personas. Staff can manage inventory.
+        Owners can manage users and edit the Gem Expert's persona. Staff can manage inventory.
       </p>
     </section>
   );

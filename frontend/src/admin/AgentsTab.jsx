@@ -154,19 +154,21 @@ export default function AgentsTab() {
 
   return (
     <section>
-      <div className="admin-row admin-toolbar">
-        <div className="segmented">
-          {agents.map((a) => (
-            <button
-              key={a.id}
-              className={agentId === a.id ? "segmented-active" : ""}
-              onClick={() => switchAgent(a.id)}
-            >
-              {a.display_name}
-            </button>
-          ))}
+      {agents.length > 1 && (
+        <div className="admin-row admin-toolbar">
+          <div className="segmented">
+            {agents.map((a) => (
+              <button
+                key={a.id}
+                className={agentId === a.id ? "segmented-active" : ""}
+                onClick={() => switchAgent(a.id)}
+              >
+                {a.display_name}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {error && <div className="admin-error">{error}</div>}
 

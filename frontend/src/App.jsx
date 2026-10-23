@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchAgents, fetchFeatured, routeQuestion, streamChat } from "./api.js";
+import { fetchAgents, fetchFeatured, streamChat } from "./api.js";
 import { friendlyChatError } from "./chatErrors.js";
 import { loadHistory, saveHistory } from "./chatStore.js";
 import { previewHandlers } from "./components/PreviewCard.jsx";
@@ -11,22 +11,21 @@ import {
   ClosingCall,
   Hero,
   HowItWorks,
+  MeetExpert,
   OnTheCounter,
-  Partners,
   SiteFooter,
   SiteHeader,
 } from "./site/Sections.jsx";
 
 export default function App() {
-  const [agents, setAgents] = useState([]);
+  const [expert, setExpert] = useState(null); // the shop's one AI partner
   const [featured, setFeatured] = useState([]);
   const [loadError, setLoadError] = useState(null);
-  const [histories, setHistories] = useState({}); // agentId -> turns
-  const [restored, setRestored] = useState({}); // agentId -> came from a past visit
-  const [counterId, setCounterId] = useState(null); // open chat, or null
-  const [lastId, setLastId] = useState(null);
-  const [live, setLive] = useState(null); // {agentId, turn} while a reply streams
-  const [errors, setErrors] = useState({});
+  const [history, setHistoryState] = useState([]);
+  const [restored, setRestored] = useState(false); // chat came from a past visit
+  const [open, setOpen] = useState(false); // the chat overlay
+  const [live, setLive] = useState(null); // the reply while it streams
+  const [error, setError] = useState(null);
   const [showFloat, setShowFloat] = useState(false);
   const busyRef = useRef(false);
   const location = useLocation();
@@ -34,17 +33,19 @@ export default function App() {
 
   // Following a link (e.g. "View details" on a stone card) closes the chat.
   useEffect(() => {
-    setCounterId(null);
+    setOpen(false);
   }, [location.path]);
 
   useEffect(() => {
     fetchAgents()
       .then((list) => {
-        setAgents(list);
-        const saved = {};
-        for (const a of list) saved[a.id] = loadHistory(a.id);
-        setHistories(saved);
-        setRestored(Object.fromEntries(list.map((a) => [a.id, saved[a.id].length > 0])));
+        const first = list[0] || null;
+        setExpert(first);
+        if (first) {
+          const saved = loadHistory(first.id);
+          setHistoryState(saved);
+          setRestored(saved.length > 0);
+        }
       })
       .catch((err) => setLoadError(err.message));
     fetchFeatured().then(setFeatured);
@@ -59,124 +60,105 @@ export default function App() {
 
   // The chat covers the page, so stop the page scrolling underneath.
   useEffect(() => {
-    if (!counterId) return;
+    if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [counterId]);
+  }, [open]);
 
-  const setHistory = useCallback((agentId, turns) => {
-    setHistories((prev) => ({ ...prev, [agentId]: turns }));
-    saveHistory(agentId, turns);
-  }, []);
+  const setHistory = useCallback(
+    (turns) => {
+      setHistoryState(turns);
+      if (expert) saveHistory(expert.id, turns);
+    },
+    [expert]
+  );
 
   const sendMessage = useCallback(
-    async (agentId, message) => {
-      if (busyRef.current) return false;
-      const agent = agents.find((a) => a.id === agentId);
-      if (!agent) return false;
+    async (message) => {
+      if (busyRef.current || !expert) return false;
       busyRef.current = true;
-      const before = histories[agentId] || [];
-      setErrors((e) => ({ ...e, [agentId]: null }));
-      setHistories((prev) => ({ ...prev, [agentId]: [...before, { role: "user", content: message }] }));
+      const before = history;
+      setError(null);
+      setHistoryState([...before, { role: "user", content: message }]);
 
       const turn = { role: "assistant", content: "", cards: [], images: [], streaming: true };
       const update = (fields) => {
         Object.assign(turn, fields);
-        setLive({ agentId, turn: { ...turn } });
+        setLive({ ...turn });
       };
       update({});
       try {
-        const done = await streamChat(agentId, message, before, {
+        const done = await streamChat(expert.id, message, before, {
           onDelta: (text) => update({ content: turn.content + text }),
           onCard: (card) => update({ cards: [...turn.cards, card] }),
           ...previewHandlers(turn, update),
         });
-        setHistory(agentId, done.history);
+        setHistory(done.history);
         return true;
       } catch (err) {
-        setHistories((prev) => ({ ...prev, [agentId]: before }));
-        setErrors((e) => ({ ...e, [agentId]: friendlyChatError(err, agent.display_name) }));
+        setHistoryState(before);
+        setError(friendlyChatError(err, expert.display_name));
         return false;
       } finally {
         busyRef.current = false;
         setLive(null);
       }
     },
-    [agents, histories, setHistory]
+    [expert, history, setHistory]
   );
 
-  function openCounter(agentId, message) {
-    const id = agentId || lastId || agents[0]?.id;
-    if (!id) return;
-    setCounterId(id);
-    setLastId(id);
-    if (message) sendMessage(id, message);
+  function openCounter(message) {
+    if (!expert) return;
+    setOpen(true);
+    if (message) sendMessage(message);
   }
-
-  async function askFromSite(message) {
-    const id = (await routeQuestion(message)) || agents[0]?.id;
-    openCounter(id, message);
-  }
-
-  function handoff(h) {
-    setRestored((r) => ({ ...r, [h.to]: false }));
-    openCounter(h.to, h.message);
-  }
-
-  const counterAgent = agents.find((a) => a.id === counterId);
 
   return (
     <div className="site">
-      <SiteHeader onTalk={() => openCounter()} current={route.name} />
+      <SiteHeader expert={expert} onTalk={() => openCounter()} current={route.name} />
       <main>
         {loadError && (
           <div className="site-container load-error">
             We couldn't open the shop just now ({loadError}). Please refresh in a moment.
           </div>
         )}
-        {route.name === "catalogue" && <CataloguePage agents={agents} search={location.search} />}
-        {route.name === "stone" && <StonePage id={route.id} onHandoff={handoff} />}
+        {route.name === "catalogue" && <CataloguePage search={location.search} />}
+        {route.name === "stone" && <StonePage id={route.id} />}
         {route.name === "home" && (
           <>
-            <Hero agents={agents} onAsk={askFromSite} onTalk={(id) => openCounter(id)} />
-            <Partners agents={agents} onTalk={(id) => openCounter(id)} onAskPartner={openCounter} />
+            <Hero expert={expert} onAsk={openCounter} onTalk={() => openCounter()} />
+            <MeetExpert expert={expert} onTalk={() => openCounter()} onAsk={openCounter} />
             <OnTheCounter stones={featured} />
             <HowItWorks />
-            <ClosingCall onAsk={askFromSite} />
+            <ClosingCall onAsk={openCounter} />
           </>
         )}
       </main>
       <SiteFooter />
 
-      {showFloat && !counterId && agents.length > 0 && (
+      {showFloat && !open && expert && (
         <button className="float-talk" onClick={() => openCounter()}>
           <span className="float-talk-dot" aria-hidden="true" />
-          Talk to an AI partner
+          Talk to our {expert.display_name}
         </button>
       )}
 
-      {counterAgent && (
+      {open && expert && (
         <CounterView
-          agents={agents}
-          agent={counterAgent}
-          history={histories[counterAgent.id] || []}
-          live={live?.agentId === counterAgent.id ? live.turn : null}
+          agent={expert}
+          history={history}
+          live={live}
           busy={Boolean(live)}
-          error={errors[counterAgent.id]}
-          restored={restored[counterAgent.id]}
-          onSend={(message) => sendMessage(counterAgent.id, message)}
-          onSwitch={(id) => {
-            setCounterId(id);
-            setLastId(id);
-          }}
-          onClose={() => setCounterId(null)}
-          onHandoff={handoff}
+          error={error}
+          restored={restored}
+          onSend={sendMessage}
+          onClose={() => setOpen(false)}
           onStartFresh={() => {
-            setHistory(counterAgent.id, []);
-            setRestored((r) => ({ ...r, [counterAgent.id]: false }));
+            setHistory([]);
+            setRestored(false);
           }}
         />
       )}

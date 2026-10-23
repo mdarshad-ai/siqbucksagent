@@ -22,13 +22,12 @@ class ChatMessage(BaseModel):
     # own "system" (or "tool") messages alongside the agent's system prompt.
     role: Literal["user", "assistant"]
     content: str
-    # Display-only extras on an assistant reply: stone cards, AI previews,
-    # tappable follow-ups, and a handoff offer. Echoed back to the client
-    # with the history, never sent to the model.
+    # Display-only extras on an assistant reply: stone cards, AI previews
+    # and tappable follow-ups. Echoed back to the client with the history,
+    # never sent to the model.
     cards: list[dict] | None = None
     images: list[dict] | None = None
     suggestions: list[str] | None = None
-    handoff: dict | None = None
     # The implicit opening question on a stone page: part of the history the
     # model sees, but not shown as a bubble.
     hidden: bool | None = None
@@ -39,7 +38,6 @@ class ChatResponse(BaseModel):
     cards: list[dict] = []
     images: list[dict] = []
     suggestions: list[str] = []
-    handoff: dict | None = None
     history: list[ChatMessage]
 
 
@@ -71,7 +69,6 @@ def _updated_history(history, message, result):
             cards=result["cards"] or None,
             images=result.get("images") or None,
             suggestions=result["suggestions"] or None,
-            handoff=result["handoff"],
         ),
     ]
 
@@ -95,7 +92,6 @@ def run_chat(agent_id: str, message: str, history: list[ChatMessage], agent_over
         cards=result["cards"],
         images=result["images"],
         suggestions=result["suggestions"],
-        handoff=result["handoff"],
         history=_updated_history(history, message, result),
     )
 
@@ -106,7 +102,7 @@ def _sse(event: str, data) -> str:
 
 def stream_chat(agent_id: str, message: str, history: list[ChatMessage], context=None):
     """Server-sent events for one reply: delta / card / image_pending /
-    image / image_failed / suggestions / handoff as they happen, then "done"
+    image / image_failed / suggestions as they happen, then "done"
     with the full updated history (or "error")."""
     _require_key()
     model_history = _model_history(history)

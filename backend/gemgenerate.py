@@ -2,10 +2,10 @@
 GemGenerate: AI previews of a stone set in jewellery ("how would it look in
 a ring?").
 
-Siq and Bucks call it as a tool. The stone's real catalogue photo goes to a
+The Gem Expert calls it as a tool. The stone's real catalogue photo goes to a
 cheap image model on OpenRouter as a reference, with a fixed prompt built
-here from the stone's details - the partners never write image prompts
-themselves. Each preview is saved to storage and reused for the same
+here from the stone's details - the Gem Expert never writes image prompts
+itself. Each preview is saved to storage and reused for the same
 request, so repeats are free.
 """
 

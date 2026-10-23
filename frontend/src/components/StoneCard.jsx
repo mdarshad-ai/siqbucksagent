@@ -14,7 +14,7 @@ function stockLabel(card) {
   return `${card.quantity} in stock`;
 }
 
-// Shown under a dealer's reply when they recommend a stone.
+// Shown under the Gem Expert's reply when it recommends a stone.
 export default function StoneCard({ card, getTranscript = () => [] }) {
   const media = card.media || [];
   const [selected, setSelected] = useState(0);

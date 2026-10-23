@@ -170,7 +170,7 @@ def _run_tool(agent_id: str, tool_name: str, tool_args: dict, shown: list | None
     return json.dumps({"error": f"unknown tool {tool_name}"})
 
 
-TERMINAL_TOOLS = {"suggest_replies", "refer_to_partner"}
+TERMINAL_TOOLS = {"suggest_replies"}
 MAX_SUGGESTIONS = 3
 MAX_IMAGES_PER_REPLY = 2
 
@@ -207,10 +207,9 @@ def _gemgenerate(agent_id, args, context, images):
     })
 
 
-def build_tools(partners: list[dict], images: bool = False):
-    """The fixed tools plus the two whose options depend on the partners (and
-    gemgenerate when AI previews are on)."""
-    tools = list(TOOLS) + ([gemgenerate.TOOL] if images else []) + [
+def build_tools(images: bool = False):
+    """The fixed tools, plus gemgenerate when AI previews are on."""
+    return list(TOOLS) + ([gemgenerate.TOOL] if images else []) + [
         {
             "type": "function",
             "function": {
@@ -235,55 +234,13 @@ def build_tools(partners: list[dict], images: bool = False):
             },
         }
     ]
-    if partners:
-        tools.append(
-            {
-                "type": "function",
-                "function": {
-                    "name": "refer_to_partner",
-                    "description": (
-                        "Offer to hand the customer over to your partner when "
-                        "what they want fits the partner's line better than "
-                        "yours. The customer sees a button to continue with "
-                        "the partner, who receives customer_request."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "partner_id": {"type": "string", "enum": [p["id"] for p in partners]},
-                            "customer_request": {
-                                "type": "string",
-                                "description": (
-                                    "What the customer wants, in their voice, "
-                                    "e.g. 'I'm after amethyst under $30.'"
-                                ),
-                            },
-                        },
-                        "required": ["partner_id", "customer_request"],
-                    },
-                },
-            }
-        )
-    return tools
 
 
-def _terminal_tool(tool_name, args, partners, state):
-    """suggest_replies / refer_to_partner: they only shape the UI."""
-    if tool_name == "suggest_replies":
-        options = [str(o).strip()[:80] for o in (args.get("options") or []) if str(o).strip()]
-        state["suggestions"] = options[:MAX_SUGGESTIONS]
-        return {"type": "suggestions", "options": state["suggestions"]}
-    partner = next((p for p in partners if p["id"] == args.get("partner_id")), None)
-    request = str(args.get("customer_request") or "").strip()[:300]
-    if not partner or not request:
-        return None
-    state["handoff"] = {
-        "to": partner["id"],
-        "display_name": partner["display_name"],
-        "stall_name": partner["stall_name"],
-        "message": request,
-    }
-    return {"type": "handoff", **state["handoff"]}
+def _terminal_tool(tool_name, args, state):
+    """suggest_replies: it only shapes the UI."""
+    options = [str(o).strip()[:80] for o in (args.get("options") or []) if str(o).strip()]
+    state["suggestions"] = options[:MAX_SUGGESTIONS]
+    return {"type": "suggestions", "options": state["suggestions"]}
 
 
 def _stream_completion(client, **kwargs):
@@ -315,8 +272,7 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
       {"type": "image", "id", "image"}   the finished preview (gemgenerate)
       {"type": "image_failed", "id"}     the preview couldn't be made
       {"type": "suggestions", "options"} tappable follow-ups
-      {"type": "handoff", "to", ...}     offer to continue with the partner
-      {"type": "done", "reply", "cards", "images", "suggestions", "handoff"}
+      {"type": "done", "reply", "cards", "images", "suggestions"}
 
     history: plain {"role", "content"} turns from the client.
     agent_override: persona/selling_rules for the admin preview; tools still
@@ -337,18 +293,17 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
         )
 
     model = os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
-    partners = [a for a in database.list_agents() if a["id"] != agent_id]
     images_on = context is not None and bool(limits.get_settings()["image_enabled"])
-    tools = build_tools(partners, images=images_on)
+    tools = build_tools(images=images_on)
 
-    messages = [{"role": "system", "content": compose_system_prompt(agent, partners)}]
+    messages = [{"role": "system", "content": compose_system_prompt(agent)}]
     messages.extend({"role": h["role"], "content": h["content"]} for h in history)
     messages.append({"role": "user", "content": message})
 
     client = _get_client()
     cards = []
     images = []
-    state = {"suggestions": [], "handoff": None}
+    state = {"suggestions": []}
     # Models may talk alongside a tool call and then finish with an empty
     # message, so every piece of text counts toward the reply.
     segments = []
@@ -391,10 +346,8 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
             except json.JSONDecodeError:
                 args = {}
             if tc["name"] in TERMINAL_TOOLS:
-                event = _terminal_tool(tc["name"], args, partners, state)
-                if event:
-                    yield event
-                result = json.dumps({"ok": bool(event)})
+                yield _terminal_tool(tc["name"], args, state)
+                result = json.dumps({"ok": True})
             elif tc["name"] == "gemgenerate" and images_on:
                 result = yield from _gemgenerate(agent_id, args, context, images)
             else:
@@ -404,8 +357,8 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
                     yield {"type": "card", "card": card}
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
 
-        # suggest_replies / refer_to_partner come with the final message, so
-        # there's nothing left to ask the model.
+        # suggest_replies comes with the final message, so there's nothing
+        # left to ask the model.
         if all(tc["name"] in TERMINAL_TOOLS for tc in tool_calls):
             break
 
@@ -415,8 +368,6 @@ def stream_agent(agent_id: str, message: str, history: list[dict], agent_overrid
             reply = "Here's a preview - an AI sketch, not the finished piece."
         elif cards:
             reply = "Have a look at this one below."
-        elif state["handoff"]:
-            reply = f"{state['handoff']['display_name']} is the one to ask about that."
         else:
             reply = "Sorry, I'm having trouble looking that up right now."
         yield {"type": "delta", "text": reply}
