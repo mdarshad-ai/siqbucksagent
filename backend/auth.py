@@ -7,6 +7,7 @@ Roles:
   staff - inventory only
 """
 
+import hashlib
 import logging
 import os
 import secrets
@@ -179,3 +180,48 @@ def bootstrap_owner():
         return
     database.create_user(email, hash_password(password), "owner", must_change_password=False)
     logger.info("Created first owner account for %s", email)
+
+
+# ---------- password recovery switch ----------
+
+RESET_SETTING = "password_reset_applied"
+
+
+def reset_owner_password():
+    """The "forgot password" switch for owners. With ADMIN_RESET_PASSWORD=true,
+    the ADMIN_EMAIL account gets ADMIN_PASSWORD as a temporary password on
+    startup (created as an owner if it doesn't exist; made an owner if it
+    does), every old login for it stops working, and a new password must be
+    chosen at the next login. It's applied once per email + password, so
+    restarts don't undo the password chosen afterwards."""
+    if os.environ.get("ADMIN_RESET_PASSWORD", "").strip().lower() not in ("1", "true", "yes", "on"):
+        return
+    email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    password = os.environ.get("ADMIN_PASSWORD", "")
+    if not email or len(password) < MIN_PASSWORD_LENGTH:
+        logger.warning(
+            "ADMIN_RESET_PASSWORD is on, but ADMIN_EMAIL is missing or ADMIN_PASSWORD "
+            "is shorter than %d characters - no password was reset", MIN_PASSWORD_LENGTH,
+        )
+        return
+    fingerprint = hashlib.sha256(f"{email}\n{password}".encode()).hexdigest()
+    if database.get_settings_rows().get(RESET_SETTING) == fingerprint:
+        logger.warning(
+            "ADMIN_RESET_PASSWORD is still on (already applied for %s). Remove it "
+            "from your environment settings.", email,
+        )
+        return
+
+    user = database.get_user_by_email(email)
+    if user:
+        database.set_user_password(user["id"], hash_password(password), must_change_password=True)
+        if user["role"] != "owner":
+            database.set_user_role(user["id"], "owner")
+    else:
+        database.create_user(email, hash_password(password), "owner", must_change_password=True)
+    clear_login_failures(email)
+    database.set_settings({RESET_SETTING: fingerprint}, "password-reset")
+    logger.warning(
+        "Password reset for %s. Log in with ADMIN_PASSWORD, choose a new password, "
+        "then remove ADMIN_RESET_PASSWORD.", email,
+    )

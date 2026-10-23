@@ -25,7 +25,9 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      # First owner login for /admin. Only used when there are no users yet.
+      # First owner login for /admin. Only used when there are no users yet,
+      # or with ADMIN_RESET_PASSWORD=true (add it by hand) to recover a
+      # forgotten owner password - see the README.
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD

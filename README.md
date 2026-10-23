@@ -251,6 +251,16 @@ is created from `ADMIN_EMAIL` / `ADMIN_PASSWORD` when there are no users yet.
 - **Users** (owners only): add owners or staff. A new user gets a one-time
   temporary password (shown once) and must choose their own at first login.
   Owners can change roles, reset passwords and remove users.
+- **Forgot password?** (link on the login page): there's no email reset.
+  Staff ask an owner to *Reset password* under *Users*. An owner who is
+  locked out uses the recovery switch: in Render → Environment set
+  `ADMIN_EMAIL` to their login email, `ADMIN_PASSWORD` to a temporary
+  password (10+ characters) and add `ADMIN_RESET_PASSWORD=true`, then save.
+  On restart that account gets the temporary password (it's created, or
+  made an owner, if needed), all its old logins stop working, and a new
+  password must be chosen at login. It's applied once per email and
+  password, so later restarts don't undo the new password — but delete
+  `ADMIN_RESET_PASSWORD` afterwards.
 
 ## 5. Deploy — Railway (paid after a trial)
 

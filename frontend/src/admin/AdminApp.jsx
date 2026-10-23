@@ -7,11 +7,32 @@ import SettingsTab from "./SettingsTab.jsx";
 import RequestsTab from "./RequestsTab.jsx";
 import "./admin.css";
 
+// There's no email reset (the shop doesn't send email), so this explains
+// the two ways back in.
+function ForgotPassword() {
+  return (
+    <div className="admin-forgot" role="note">
+      <p>
+        <strong>Staff:</strong> ask an owner to open <em>Users</em> and click <em>Reset password</em>.
+        You'll get a temporary password and choose your own when you log in.
+      </p>
+      <p>
+        <strong>Owners:</strong> in your hosting settings (Render → Environment), set{" "}
+        <code>ADMIN_EMAIL</code> to your login email, <code>ADMIN_PASSWORD</code> to a temporary
+        password (10+ characters) and <code>ADMIN_RESET_PASSWORD</code> to <code>true</code>, then
+        save. Once the app restarts, log in with the temporary password, choose a new one, and
+        delete <code>ADMIN_RESET_PASSWORD</code>.
+      </p>
+    </div>
+  );
+}
+
 function LoginForm({ onLoggedIn }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
@@ -44,6 +65,15 @@ function LoginForm({ onLoggedIn }) {
       <button className="btn btn-primary" disabled={busy}>
         {busy ? "Logging in..." : "Log in"}
       </button>
+      <button
+        type="button"
+        className="admin-link"
+        aria-expanded={forgot}
+        onClick={() => setForgot((f) => !f)}
+      >
+        Forgot password?
+      </button>
+      {forgot && <ForgotPassword />}
     </form>
   );
 }
